@@ -16,8 +16,8 @@ import 'parser1.dart';
   }
 
   if (tokenizeds.length < 3) {
-    //TODO simply map MyToken to a LoneXRange
-    throw Exception('TODO simply map MyToken to a LoneXRange');
+    final res = tokenizeds.map((e) => loneRangeFrom(e)).toList();
+    return (res, null);
   }
   // now tokenizeds.length >=3
   final List<int> hyphenIndexes = tokenizeds.indexed
@@ -30,10 +30,11 @@ import 'parser1.dart';
       // _TypeError (type '(Null, Null)' is not a subtype of type '(MyToken, Null)' of 'value')
       .map((e) => (e, null) as (MyToken?, XRange?))
       .toList();
-
+/* 
   if (hyphenIndexes.isEmpty) {
-    throw Exception('TODO HyphenIndexes==-1');
+    print('TODO HyphenIndexes isEmpty=> no nedd');
   }
+   */
   for (var idx in hyphenIndexes) {
     final XRange? xRange = xRange2From(idx, myTokenOrXRangeList);
     if (xRange == null) {
@@ -60,9 +61,8 @@ import 'parser1.dart';
     final XRange xRange = loneRangeFrom(tk);
     myTokenOrXRangeList[i] = (null, xRange);
   }
-// checking that all token has been consumed
-  final List<int> indexesMyTokenNotEmpty = myTokenOrXRangeList
-      .indexed
+  // checking that all token has been consumed
+  final List<int> indexesMyTokenNotEmpty = myTokenOrXRangeList.indexed
       .where((pair) => pair.$2.$1 != null)
       .map((pair) => pair.$1)
       .toList()
@@ -73,21 +73,18 @@ import 'parser1.dart';
       'error:  token at index $indexesMyTokenNotEmpty has not been consummed while producing the Ranges\nmyTokenOrXRangeList: $myTokenOrXRangeList',
     );
   }
-  
+
   // remove null,null
   // final List<(MyToken?, XRange?)> myTokenOrXRangeListNullsRemoved11 =      myTokenOrXRangeList.where((e) => e.$1 != null && e.$2 != null).toList();
 
-// disregarding null xRange (only found in null, null in theory)
+  // disregarding null xRange (only found in null, null in theory)
   final List<XRange> xRanges = myTokenOrXRangeList
       .where((e) => e.$2 != null)
       .map((e) => e.$2!)
       .toList();
 
-
-
-// checking that no ErrorRange
-  final List<int> indexesErrorXRange = xRanges
-      .indexed
+  // checking that no ErrorRange
+  final List<int> indexesErrorXRange = xRanges.indexed
       .where((pair) => pair.$2 is ErrorXRange)
       .map((pair) => pair.$1)
       .toList();
@@ -97,20 +94,6 @@ import 'parser1.dart';
       'error: ErrorXRange at index $indexesErrorXRange. \nxRanges: $xRanges',
     );
   }
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   return (xRanges, null);
 }
@@ -197,7 +180,7 @@ class WeekDayLyRange extends XRange {
 class ErrorXRange extends XRange {
   final String message;
   ErrorXRange(super.startToken, super.endToken, this.message);
-  
+
   @override
   String toString() {
     return 'ErrorXRange($message)';
