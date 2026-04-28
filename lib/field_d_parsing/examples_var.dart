@@ -1,4 +1,5 @@
 
+const examplesL7='''APR 06 - MAY 01''';
 const examplesL5='''MON-FRI 0700-SS EXC NOV 11 DEC 25 JAN 01,  SAT 0900-1100 1300-SS ''';
 const examplesL2='''0800 1900''';
 const examplesL4='''0700-2100 SS''';

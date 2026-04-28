@@ -1,3 +1,4 @@
+// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'my_token_class_tokenizer.dart';
 import 'parser1.dart';
 
@@ -24,35 +25,46 @@ import 'parser1.dart';
       .where((itk) => itk.$2 is HyphenToken)
       .map((e) => e.$1)
       .toList();
-  //final XRange?  nullRange = null;
+  // this List<(MyToken?, XRange?)> will be (MyToken,null) at the beginning and (null,XRange) or (null,null) at the end of the process
   final List<(MyToken?, XRange?)> myTokenOrXRangeList = tokenizeds
       // if you do not do (e, null) as (MyToken?, XRange?) then the type of the list is (MyToken, Null) meading to error:
       // _TypeError (type '(Null, Null)' is not a subtype of type '(MyToken, Null)' of 'value')
       .map((e) => (e, null) as (MyToken?, XRange?))
       .toList();
-/* 
+  /* 
   if (hyphenIndexes.isEmpty) {
     print('TODO HyphenIndexes isEmpty=> no nedd');
   }
    */
   for (var idx in hyphenIndexes) {
-    final XRange? xRange = xRange2From(idx, myTokenOrXRangeList);
-    if (xRange == null) {
+    if (0 <= idx - 2 && idx + 2 < myTokenOrXRangeList.length) {
+      final MonthDayRange? xRange4 = xRange4From(idx, myTokenOrXRangeList);
+
+      /// if there is a MonthDay pattern we create the XRange and proceed with next loop
+      if (xRange4 != null) {
+        myTokenOrXRangeList[idx - 2] = (null, null);
+        myTokenOrXRangeList[idx - 1] = (null, null);
+        myTokenOrXRangeList[idx] = (null, xRange4);
+        myTokenOrXRangeList[idx + 1] = (null, null);
+        myTokenOrXRangeList[idx + 2] = (null, null);
+        continue;
+      }
+    }
+
+    /// if there is a twin pattern we create the XRange
+    final XRange? xRange2 = xRange2From(idx, myTokenOrXRangeList);
+    if (xRange2 == null) {
       continue;
     }
     //  print('found XRange: $xRange at index: $idx');
     // print('myTokenOrXRangeList before: $myTokenOrXRangeList before');
     myTokenOrXRangeList[idx - 1] = (null, null);
-    myTokenOrXRangeList[idx] = (null, xRange);
+    myTokenOrXRangeList[idx] = (null, xRange2);
     myTokenOrXRangeList[idx + 1] = (null, null);
     // print('myTokenOrXRangeList after: $myTokenOrXRangeList before');
   }
   print('');
-  // do the dame for xRange4From
-
-  /* 
-  */
-  // then create loneRangeFrom
+  // then create loneRange From remaining
   for (var i = 0; i < myTokenOrXRangeList.length; i++) {
     final tk = myTokenOrXRangeList[i].$1;
     if (tk == null) {
@@ -61,7 +73,7 @@ import 'parser1.dart';
     final XRange xRange = loneRangeFrom(tk);
     myTokenOrXRangeList[i] = (null, xRange);
   }
-  // checking that all token has been consumed
+  // proto: checking that all token has been consumed
   final List<int> indexesMyTokenNotEmpty = myTokenOrXRangeList.indexed
       .where((pair) => pair.$2.$1 != null)
       .map((pair) => pair.$1)
@@ -74,10 +86,7 @@ import 'parser1.dart';
     );
   }
 
-  // remove null,null
-  // final List<(MyToken?, XRange?)> myTokenOrXRangeListNullsRemoved11 =      myTokenOrXRangeList.where((e) => e.$1 != null && e.$2 != null).toList();
-
-  // disregarding null xRange (only found in null, null in theory)
+  // keeping only xRange
   final List<XRange> xRanges = myTokenOrXRangeList
       .where((e) => e.$2 != null)
       .map((e) => e.$2!)
@@ -96,6 +105,41 @@ import 'parser1.dart';
   }
 
   return (xRanges, null);
+}
+
+/// returns the MonthDay XRange of 4 values (before and after index) in provided List. Null if Not possible.
+///
+/// Null if element at index idx +/-2 do not exist.
+MonthDayRange? xRange4From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeList) {
+  if (idx - 2 < 0 || myTokenOrXRangeList.length <= idx + 2) {
+    return null;
+  }
+
+  final prev2 = myTokenOrXRangeList[idx - 2].$1;
+  final prev1 = myTokenOrXRangeList[idx - 1].$1;
+  final next1 = myTokenOrXRangeList[idx + 1].$1;
+  final next2 = myTokenOrXRangeList[idx + 2].$1;
+  /* 
+   */
+  if (prev2 is! MonthToken ||
+      prev1 is! TwoDigitToken ||
+      next1 is! MonthToken ||
+      next2 is! TwoDigitToken) {
+    return null;
+  }
+  // useless but avoid null checks
+  /* 
+  if (prev2 == null || prev1 == null || next1 == null || next2 == null) {
+    return null;
+  } */
+  return MonthDayRange(
+    prev2,
+    next2,
+    startMonthToken: prev2,
+    startDayToken: prev1,
+    endMonthToken: next1,
+    endDayToken: next2,
+  );
 }
 
 /// returns the XRange of 2 values (before and after index) in provided List. Null if Not possible.
@@ -169,14 +213,35 @@ class MonthRange extends XRange {
   MonthRange(super.startToken, super.endToken);
 }
 
+/// use month as start end Token and repeat them in the fields
 class MonthDayRange extends XRange {
-  MonthDayRange(super.startToken, super.endToken);
+  final MyToken startMonthToken;
+  final MyToken startDayToken;
+
+  final MyToken endMonthToken;
+  final MyToken endDayToken;
+  MonthDayRange(
+    super.startToken,
+    super.endToken, {
+    required this.startMonthToken,
+    required this.startDayToken,
+    required this.endMonthToken,
+    required this.endDayToken,
+  });
+
+  @override
+  String toString() {
+    return 'MonthDayRange($startMonthToken $startDayToken -> $endMonthToken $endDayToken)';
+  }
 }
 
 class WeekDayLyRange extends XRange {
   WeekDayLyRange(super.startToken, super.endToken);
 }
 
+/// used to describe errors.
+///
+/// repeat the Token is there is only one to fill the fields
 class ErrorXRange extends XRange {
   final String message;
   ErrorXRange(super.startToken, super.endToken, this.message);
