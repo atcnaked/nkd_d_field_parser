@@ -1,6 +1,5 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'my_token_class_tokenizer.dart';
-import 'parser1.dart';
 
 (List<XRange>?, String?) gatherAndProduceRange(List<MyToken> tokenizeds) {
   if (tokenizeds.isEmpty) {
@@ -38,7 +37,7 @@ import 'parser1.dart';
    */
   for (var idx in hyphenIndexes) {
     if (0 <= idx - 2 && idx + 2 < myTokenOrXRangeList.length) {
-      final MonthDayRange? xRange4 = xRange4From(idx, myTokenOrXRangeList);
+      final X4Range? xRange4 = xRange4From(idx, myTokenOrXRangeList);
 
       /// if there is a MonthDay pattern we create the XRange and proceed with next loop
       if (xRange4 != null) {
@@ -52,7 +51,7 @@ import 'parser1.dart';
     }
 
     /// if there is a twin pattern we create the XRange
-    final XRange? xRange2 = xRange2From(idx, myTokenOrXRangeList);
+    final X2Range? xRange2 = xRange2From(idx, myTokenOrXRangeList);
     if (xRange2 == null) {
       continue;
     }
@@ -110,7 +109,7 @@ import 'parser1.dart';
 /// returns the MonthDay XRange of 4 values (before and after index) in provided List. Null if Not possible.
 ///
 /// Null if element at index idx +/-2 do not exist.
-MonthDayRange? xRange4From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeList) {
+X4Range? xRange4From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeList) {
   if (idx - 2 < 0 || myTokenOrXRangeList.length <= idx + 2) {
     return null;
   }
@@ -121,36 +120,39 @@ MonthDayRange? xRange4From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeLis
   final next2 = myTokenOrXRangeList[idx + 2].$1;
   /* 
    */
-  if (prev2 is! MonthToken ||
-      prev1 is! TwoDigitToken ||
-      next1 is! MonthToken ||
-      next2 is! TwoDigitToken) {
-    return null;
+  if ((prev2 is TwoDigitToken || prev2 is WeekDayLyToken) &&
+      prev1 is HourToken &&
+      (next1 is TwoDigitToken || next1 is WeekDayLyToken) &&
+      next2 is HourToken) {
+    return DayOrWeekDayHourRange(
+      startDToken: prev2!,
+      startHToken: prev1,
+      endDToken: next1!,
+      endHToken: next2,
+    );
   }
-  // useless but avoid null checks
-  /* 
-  if (prev2 == null || prev1 == null || next1 == null || next2 == null) {
-    return null;
-  } */
-  return MonthDayRange(
-    prev2,
-    next2,
-    startMonthToken: prev2,
-    startDayToken: prev1,
-    endMonthToken: next1,
-    endDayToken: next2,
-  );
+
+  if (prev2 is MonthToken && prev1 is TwoDigitToken && next1 is MonthToken ||
+      next2 is TwoDigitToken) {
+    return MonthDayRange(
+      startMonthToken: prev2!,
+      startDayToken: prev1!,
+      endMonthToken: next1!,
+      endDayToken: next2!,
+    );
+  }
+  return null;
 }
 
 /// returns the XRange of 2 values (before and after index) in provided List. Null if Not possible.
-XRange? xRange2From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeList) {
+X2Range? xRange2From(int idx, List<(MyToken?, XRange?)> myTokenOrXRangeList) {
   final prev = myTokenOrXRangeList[idx - 1].$1;
   final next = myTokenOrXRangeList[idx + 1].$1;
 
   if (prev == null || next == null) {
     return null;
   }
-  final XRange? xRange = myXRange2From(prev, next);
+  final X2Range? xRange = myXRange2From(prev, next);
 
   return xRange;
 }
@@ -161,68 +163,100 @@ XRange loneRangeFrom(MyToken theToken) {
     return Date2Range(theToken, theToken);
   }
   if (theToken is MonthToken) {
-    return MonthRange(theToken, theToken);
+    return MonthRange(theToken);
   }
   if (theToken is WeekDayLyToken) {
     return WeekDayLyRange(theToken, theToken);
   }
-  return ErrorXRange(
-    theToken,
-    theToken,
-    'incorrect type error: ${theToken.runtimeType}',
-  );
+  return ErrorXRange(theToken, 'incorrect type error: ${theToken.runtimeType}');
 }
 
 /// returns the XRange of 2 values. Null if Not possible.
-XRange? myXRange2From(MyToken prev, MyToken next) {
+X2Range? myXRange2From(MyToken prev, MyToken next) {
   if (prev is TimeToken && next is TimeToken) {
     return TimeRange(prev, next);
   }
   if (prev is TwoDigitToken && next is TwoDigitToken) {
     return Date2Range(prev, next);
-  }
+  } /* 
   if (prev is MonthToken && next is MonthToken) {
     return MonthRange(prev, next);
-  }
+  } */
   if (prev is WeekDayLyToken && next is WeekDayLyToken) {
     return WeekDayLyRange(prev, next);
   }
   return null;
 }
 
-sealed class XRange {
+sealed class XRange {}
+
+sealed class X1Range extends XRange {}
+
+sealed class X4Range extends XRange {}
+
+sealed class X2Range extends XRange {
   final MyToken startToken;
   final MyToken endToken;
 
-  XRange(this.startToken, this.endToken);
+  X2Range(this.startToken, this.endToken);
+}
+
+class TimeRange extends X2Range {
+  TimeRange(super.startToken, super.endToken);
   @override
   String toString() {
-    return 'XRange($startToken-$endToken)';
+    return 'TimeRange($startToken-$endToken)';
   }
 }
 
-class TimeRange extends XRange {
-  TimeRange(super.startToken, super.endToken);
-}
-
-class Date2Range extends XRange {
+/// range build from days of 1 or 2 digits.
+///
+/// When it deals with one day, use set endToken = startToken
+class Date2Range extends X2Range {
   Date2Range(super.startToken, super.endToken);
+  @override
+  String toString() {
+    return 'Date2Range($startToken-$endToken)';
+  }
 }
 
-class MonthRange extends XRange {
-  MonthRange(super.startToken, super.endToken);
+/// range for 1 month only
+class MonthRange extends X1Range {
+  final MonthToken monthToken;
+  MonthRange(this.monthToken);
+  @override
+  String toString() {
+    return 'MonthRange($monthToken)';
+  }
 }
 
 /// use month as start end Token and repeat them in the fields
-class MonthDayRange extends XRange {
+class DayOrWeekDayHourRange extends X4Range {
+  final MyToken startDToken;
+  final HourToken startHToken;
+  final MyToken endDToken;
+  final HourToken endHToken;
+  DayOrWeekDayHourRange({
+    required this.startDToken,
+    required this.startHToken,
+    required this.endDToken,
+    required this.endHToken,
+  });
+
+  @override
+  String toString() {
+    return 'DayOrWeekDayHourRange($startDToken $startHToken -> $endDToken $endHToken)';
+  }
+}
+
+/// use month as start end Token and repeat them in the fields
+class MonthDayRange extends X4Range {
   final MyToken startMonthToken;
   final MyToken startDayToken;
 
   final MyToken endMonthToken;
   final MyToken endDayToken;
-  MonthDayRange(
-    super.startToken,
-    super.endToken, {
+  MonthDayRange({
     required this.startMonthToken,
     required this.startDayToken,
     required this.endMonthToken,
@@ -235,19 +269,26 @@ class MonthDayRange extends XRange {
   }
 }
 
-class WeekDayLyRange extends XRange {
+/// a range build from WeekDayLyToken
+class WeekDayLyRange extends X2Range {
   WeekDayLyRange(super.startToken, super.endToken);
+  @override
+  String toString() {
+    return 'WeekDayLyRange($startToken-$endToken)';
+  }
 }
 
 /// used to describe errors.
 ///
 /// repeat the Token is there is only one to fill the fields
 class ErrorXRange extends XRange {
+  final MyToken token;
+
   final String message;
-  ErrorXRange(super.startToken, super.endToken, this.message);
+  ErrorXRange(this.token, this.message);
 
   @override
   String toString() {
-    return 'ErrorXRange($message)';
+    return 'ErrorXRange($message, token: $token)';
   }
 }

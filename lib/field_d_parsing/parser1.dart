@@ -5,7 +5,7 @@ import 'range_producer.dart';
 
 void parseLines() {
   // adding space around hyphens so that they are isolated after sanitization
-  final exD1Hyphen = examplesL6.replaceAll(RegExp(r'-'), ' - ');
+  final exD1Hyphen = examplesValid1.replaceAll(RegExp(r'-'), ' - ');
   final sanitized = exD1Hyphen.replaceAll(RegExp(r' +'), ' ');
 
   //final OneLine = exD1.replaceAll(RegExp(r'\n'), '');
