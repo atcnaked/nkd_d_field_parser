@@ -1,9 +1,10 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
+import 'decoded_rules.dart';
 import 'examples_var.dart';
 import 'my_token_class_tokenizer.dart';
 import 'range_producer.dart';
 
-void parseLines() {
+ parseLines() {
   // adding space around hyphens so that they are isolated after sanitization
   final exD1Hyphen = examplesValid1.replaceAll(RegExp(r'-'), ' - ');
   final sanitized = exD1Hyphen.replaceAll(RegExp(r' +'), ' ');
@@ -63,8 +64,10 @@ void parseLines() {
         continue;
       }
 
-      print('tokenizedRules.1=>${tokenizedRules.$1.join(' ')}');
-      print('tokenizedExclusions.1=>${tokenizedExclusions.$1.join(' ')}');
+      print('List<MyToken> tokenizedRules = ${tokenizedRules.$1.join(' ')}');
+      print(
+        'List<MyToken> tokenizedExclusions = ${tokenizedExclusions.$1.join(' ')}',
+      );
       // gathering and producing range
 
       final (List<XRange>?, String?) xRangesResult = gatherAndProduceRange(
@@ -77,9 +80,23 @@ void parseLines() {
       print('\n(recall) handling line: $line');
 
       print('OK gatherAndProduceRange: ${xRangesResult.$1}');
+
+      // try to read List<XRange> from L to R
+      // we need a context?
+      final List<XRange> ranges =xRangesResult.$1!;
+      if (ranges.isEmpty) {
+        // NB: if the func return void the compiler refuses because it has to return void. 
+        // if I remove void (so it becomes dynamic then now I can throw)
+        return throw Exception('List<XRange> is empty');
+      }
+      final DateTime B = DateTime(2026);
+      final DateTime C= DateTime(2026);
+      final List<(DateTime,List<DateTime>)> decodedRules = getDecodedOf(ranges,B,C);
+      
     }
   }
 }
+
 
 /// some rules with an optional exclusion
 ///
