@@ -138,6 +138,7 @@ class NotamSchedule {
         .trim();
   }
 
+
   // Handles: parse_days and parse_dates logic from Ruby
   static List<NotamSchedule> _parseUnit(String rules, String exceptions, DateTime baseDate, {required bool isDays}) {
     // Split on time range. In Dart, we use a regex match to find where the time starts
@@ -184,10 +185,91 @@ class NotamSchedule {
   }
 
   static List<NotamSchedule> _parseDatetimes(String rules, String exceptions, DateTime baseDate) {
+    // 1. Split rules into 'from' and 'to' strings
+    final parts = rules.split('-');
+    if (parts.length != 2) {
+      throw FormatException('Invalid datetime range format: $rules');
+    }
+
+    // 2. Parse the individual from and to datetime components
+    final from = _datetimeFrom(parts[0].trim(), baseDate);
+    final to = _datetimeFrom(parts[1].trim(), baseDate);
+
+    // Calculate the delta in days (ignoring the exact time)
+    final fromDateOnly = DateTime(from.date.year, from.date.month, from.date.day);
+    final toDateOnly = DateTime(to.date.year, to.date.month, to.date.day);
+    final delta = toDateOnly.difference(fromDateOnly).inDays;
+
+    if (delta < 1) {
+      throw FormatException('Invalid datetime range: delta is less than 1 day ($rules)');
+    }
+
+    // 3. Parse exceptions. Since active units are Dates, OPADD dictates exceptions must be Days.
+    final inactives = _daysFrom(exceptions);
+
+    final List<NotamSchedule> results = [];
+
+    // Block 1: The Start Day (From start time until End of Day)
+    results.add(NotamSchedule._(
+      actives: [AixmDate(fromDateOnly)],
+      times: [AixmRange(from.time, AixmTime.endOfDay)],
+      inactives: inactives,
+      baseDate: baseDate,
+    ));
+
+    // Block 2: The Middle Days (If there is more than 1 day difference)
+    if (delta > 1) {
+      final nextDay = fromDateOnly.add(const Duration(days: 1));
+      final prevDay = toDateOnly.subtract(const Duration(days: 1));
+      
+      results.add(NotamSchedule._(
+        actives: [AixmRange(AixmDate(nextDay), AixmDate(prevDay))],
+        times: [h24], // h24 represents 00:00 to 23:59
+        inactives: inactives,
+        baseDate: baseDate,
+      ));
+    }
+
+    // Block 3: The End Day (From Beginning of Day until end time)
+    results.add(NotamSchedule._(
+      actives: [AixmDate(toDateOnly)],
+      times: [AixmRange(AixmTime.beginningOfDay, to.time)],
+      inactives: inactives,
+      baseDate: baseDate,
+    ));
+
+    return results;
+  }
+
+  /// Helper to extract both the Date and Time from a string like "JAN 01 0800" or "05 SR"
+  static _ParsedDateTime _datetimeFrom(String string, DateTime baseDate) {
+    final match = RegExp('^$datetimeRe\$').firstMatch(string);
+    if (match == null) {
+      throw FormatException('Unrecognized datetime: $string');
+    }
+
+    final monthStr = match.namedGroup('month');
+    final dateStr = match.namedGroup('date');
+    final timeStr = match.namedGroup('time');
+
+    // If month is omitted (e.g. "05 0800"), use the baseDate's month
+    final month = monthStr != null ? months[monthStr]! : baseDate.month;
+    final day = int.parse(dateStr!);
+    
+    final date = DateTime(baseDate.year, month, day);
+    final time = _timeFrom(timeStr!);
+
+    return _ParsedDateTime(date, time);
+  }
+
+
+
+/* 
+  static List<NotamSchedule> _parseDatetimes(String rules, String exceptions, DateTime baseDate) {
     // Simplified representation for datetime ranges
     throw UnimplementedError('parseDatetimes requires full DateTime range parsing implementation.');
   }
-
+ */
   // --- TOKEN EXTRACTORS ---
 static List<dynamic> _datesFrom(String string, DateTime baseDate) {
     if (string.isEmpty) return [];
@@ -362,3 +444,9 @@ static List<dynamic> _datesFrom(String string, DateTime baseDate) {
 }
 
 
+class _ParsedDateTime {
+  final DateTime date;
+  final AixmTime time;
+  
+  _ParsedDateTime(this.date, this.time);
+}

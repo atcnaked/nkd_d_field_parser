@@ -16,44 +16,44 @@ import 'range_producer.dart';
   for (var line in lines) {
     print('\nhandling line: $line');
     final trimmed = line.trim();
-    final blocks = trimmed.split(', ');
+    final blockOrScheduleElements = trimmed.split(', ');
     //  print('parsing blocks: $blocks');
-    final blockUnits = <BlockUnit>[];
-    for (var block in blocks) {
-      final BlockUnit blockUnit;
-      final splt = block.split('EXC');
+    final blockUnitsOrScheduleElements = <BlockUnitOrScheduleElement>[];
+    for (var blockOrScheduleElement in blockOrScheduleElements) {
+      final BlockUnitOrScheduleElement blockUnitOrScheduleElement;
+      final splt = blockOrScheduleElement.split('EXC');
       if (splt.length == 1) {
-        blockUnit = BlockUnit.fromParams(
-          rulesP: block.trim(),
+        blockUnitOrScheduleElement = BlockUnitOrScheduleElement.fromParams(
+          rulesP: blockOrScheduleElement.trim(),
           exclusionP: null,
         );
       } else if (splt.length == 2) {
-        blockUnit = BlockUnit.fromParams(
+        blockUnitOrScheduleElement = BlockUnitOrScheduleElement.fromParams(
           rulesP: splt[0].trim(),
           exclusionP: splt[1].trim(),
         );
       } else {
         throw Exception(
-          'splitted block after EXC split should have length 1 or 2, found ${splt.length}, \noriginal block: $block ',
+          'splitted block after EXC split should have length 1 or 2, found ${splt.length}, \noriginal blockUnitOrScheduleElement: $blockOrScheduleElement ',
         );
       }
-      blockUnits.add(blockUnit);
+      blockUnitsOrScheduleElements.add(blockUnitOrScheduleElement);
 
       // print(trimmed);
     }
 
-    for (var indexedBlockUnit in blockUnits.indexed) {
-      final int length = blockUnits.length;
+    for (var indexedBlockUnit in blockUnitsOrScheduleElements.indexed) {
+      final int length = blockUnitsOrScheduleElements.length;
       final int idx = indexedBlockUnit.$1;
-      final BlockUnit blockUnit = indexedBlockUnit.$2;
-      print('\n=> blockUnit ${idx + 1}/$length: $blockUnit');
-      print('tokenizing blockUnit.rulesAsList: ${blockUnit.rulesAsList}');
-      final tokenizedRules = tokenize(blockUnit.rulesAsList);
+      final BlockUnitOrScheduleElement blockUnitOrScheduleElement = indexedBlockUnit.$2;
+      print('\n=> blockUnitOrScheduleElement ${idx + 1}/$length: $blockUnitOrScheduleElement');
+      print('tokenizing blockUnitOrScheduleElement.rulesAsList: ${blockUnitOrScheduleElement.rulesAsList}');
+      final tokenizedRules = tokenize(blockUnitOrScheduleElement.rulesAsList);
       print(
-        'tokenizing blockUnit.exclusionAsList: ${blockUnit.exclusionAsList}',
+        'tokenizing blockUnitOrScheduleElement.exclusionAsList: ${blockUnitOrScheduleElement.exclusionAsList}',
       );
-      final tokenizedExclusions = blockUnit.exclusionAsList.isNotEmpty
-          ? tokenize(blockUnit.exclusionAsList)
+      final tokenizedExclusions = blockUnitOrScheduleElement.exclusionAsList.isNotEmpty
+          ? tokenize(blockUnitOrScheduleElement.exclusionAsList)
           : (<MyToken>[], null);
       if (tokenizedRules.$2 != null) {
         print('${tokenizedRules.$2}, tokens: ${tokenizedRules.$1}');
@@ -68,6 +68,24 @@ import 'range_producer.dart';
       print(
         'List<MyToken> tokenizedExclusions = ${tokenizedExclusions.$1.join(' ')}',
       );
+
+
+      final (List<XRange>?, String?) xRangesResult = gatherAndProduceRange(
+        tokenizedRules.$1,
+      );
+
+      
+      if (xRangesResult.$2 != null) {
+        print('error in gatherAndProduceRange: ${xRangesResult.$2}');
+      }
+      print('\n(recall) handling line: $line');
+
+      print('OK gatherAndProduceRange: ${xRangesResult.$1}');
+
+
+//////////////////////////////
+//////////////////////////////
+
       // gathering and producing range
 
       final (List<XRange>?, String?) xRangesResult = gatherAndProduceRange(
@@ -91,28 +109,110 @@ import 'range_producer.dart';
       }
       final DateTime B = DateTime(2026);
       final DateTime C= DateTime(2026);
-      final List<(DateTime,List<DateTime>)> decodedRules = getDecodedOf(ranges,B,C);
+      final Map<DateTime,List<DateTime>> decodedRules = getDecodedOf(ranges,B,C);
+//////////////////////////////
+//////////////////////////////
+//////////////////////////////
+//////////////////////////////
       
     }
   }
 }
+/* 
+"2.3.19.4:  Punctuation:
+‘ , ’ (comma) for separation of the schedule elements:
+- groups of dates or days to which the same time periods
+apply.
+- groups of time periods that all apply to the preceding and
+qualifying dates or days"
 
+=> schedule element = groups  dates or days + groups of time periods
+
+=> a 'date' is:
+- a day number, 
+- a month followed by a day number, 
+- NO ! :  a weekday
+
+time period = 0800-1000
+time periods = 0800-1000 1200-1300 1800-2030
+
+
+
+=> however nothing distinguish between with or without date:
+ 0800-1000 and APR 1 0800- MAY 5 0200
+
+ */
+
+/* 
+timeframe seems to be the notam validity (see below)
+
+"
+Item D) – Day/Time Schedule – Abbreviations and symbols used
+Abbreviations and punctuation when used in Item D) shall be applied as described
+in the following paragraphs.
+Abbreviations for Dates and Times:
+Year: The year shall not be inserted in Item D), as it is stated in Items B)
+and C).
+When the planned time schedule goes from one year into another,
+the displayed data shall remain in chronological order; i.e.
+December of this year shall precede January of next year.
+Months: JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC
+
+// EUROCONTROL Guidelines Operating Procedures AIS Dynamic Data (OPADD)
+// Edition 4.1 Released Issue Page 41
+
+Dates: 01 02 03 .... 29 30 31
+Days: MON TUE WED THU FRI SAT SUN
+Times: Written as 4 digits (e.g.: 1030)
+Abbreviations for Time Periods and associated text:
+‘EXC’ for designating a full day or a series of full days when the NOTAM
+is NOT active.
+Note: Full day exceptions are not allowed for timeframes spanning midnight.
+Using ‘recurrent’ exceptions such as ‘except every Monday’ or ‘except
+Saturdays and Sundays’ shall be avoided.
+‘DAILY’ is optional, but recommended for activities applied every day from
+Item B) to Item C) inclusive. The expression 'nightly' shall not be
+used.
+‘EVERY’ for a schedule on fixed days.
+‘H24’ for the period 0000-2359 on the day/dates concerned. Not to be
+used as a single entry.
+‘SR’ and/or ‘SS’ if appropriate to indicate Sunrise or Sunset.
+Punctuation:
+‘ , ’ (comma) for separation of the schedule elements:
+- groups of dates or days to which the same time periods
+apply.
+- groups of time periods that all apply to the preceding and
+qualifying dates or days.
+(refer to paragraph 2.3.19.5 for the recommended syntax
+and paragraph 2.3.21.1 for clarification).
+The use of the comma for enumeration is not allowed.
+‘ - ’ (hyphen) means ‘TO’ or ‘FROM-TO’
+Note: ‘ / ’ (oblique) shall not be used in Item D).
+The use of the commas in Item D) is recommended as it helps both human and
+system readability. If used, a comma shall be placed, always and only, after a time schedule
+and only if the latter is immediately followed by a date
+"
+
+
+
+
+ */
 
 /// some rules with an optional exclusion
 ///
 /// parameters must not have been sanitized with simple space
-class BlockUnit {
+class BlockUnitOrScheduleElement {
   final String rules;
   final String exclusion;
   final List<String> rulesAsList;
   final List<String> exclusionAsList;
 
-  BlockUnit.fromParams({required String rulesP, required String? exclusionP})
+  BlockUnitOrScheduleElement.fromParams({required String rulesP, required String? exclusionP})
     : rules = rulesP.trim(),
       exclusion = exclusionP == null ? '' : exclusionP.trim(),
       rulesAsList = rulesP.trim().split(' '),
       exclusionAsList = exclusionP == null ? [] : exclusionP.split(' ');
-  BlockUnit({
+  BlockUnitOrScheduleElement({
     required this.rules,
     required this.exclusion,
     required this.rulesAsList,
@@ -120,7 +220,7 @@ class BlockUnit {
   });
 
   @override
-  String toString() => 'BlockUnit(rules: $rules, exclusion: $exclusion)';
+  String toString() => 'BlockUnitOrScheduleElement(rules: $rules, exclusion: $exclusion)';
 }
 
 /* 
@@ -135,7 +235,8 @@ class BlockUnit {
 
 2. The Three Standardized OPADD Schedule Types
 
-OPADD (and the AIXM Digital NOTAM event specification it aligns with) recognizes exactly three types of schedules for Item D. When parsing French SIA NOTAMs, you are almost guaranteed to be parsing one of these formats (or a combination):
+OPADD (and the AIXM Digital NOTAM event specification it aligns with) recognizes exactly three types of schedules for Item D. 
+When parsing French SIA NOTAMs, you are almost guaranteed to be parsing one of these formats (or a combination):
 Type A: Daily Schedules
 
 The simplest format. It indicates times that apply every day during the NOTAM's validity period.

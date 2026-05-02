@@ -1,6 +1,6 @@
 import 'range_producer.dart';
 
-List<(DateTime, List<DateTime>)> getDecodedOf(
+Map<DateTime, List<DateTime>> getDecodedOf(
   List<XRange> ranges,
   DateTime b,
   DateTime c,
