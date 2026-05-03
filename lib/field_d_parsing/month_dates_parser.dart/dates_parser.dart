@@ -18,10 +18,7 @@ import '../range_v2_producer.dart';
           'error, can not parse to int inside element: $element of dateTokens: $dateTokens',
         );
       }
-      final enumerateds = <int>[];
-      for (var i = start; i < end + 1; i++) {
-        enumerateds.add(i);
-      }
+      final List<int> enumerateds = enumeratedsFrom(start, end);
       res.addAll(enumerateds);
     } else if (element is LoneNumber) {
       final int? dateNb = int.tryParse(element.twoDigitToken.word);
@@ -45,3 +42,11 @@ import '../range_v2_producer.dart';
   return (res, null);
 }
 
+List<int> enumeratedsFrom(int start, int end) {
+  return [for (var i = start; i < end + 1; i++) i];
+  /*  final enumerateds = <int>[];
+  for (var i = start; i < end + 1; i++) {
+    enumerateds.add(i);
+  }
+  return enumerateds; */
+}

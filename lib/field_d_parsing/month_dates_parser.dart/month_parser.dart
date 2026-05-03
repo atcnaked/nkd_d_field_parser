@@ -25,8 +25,8 @@ final String monthRe = '(?:${months.keys.join('|')})';
   if (matches.isEmpty) {
     return ([], null);
   }
-  final firstNonMatch = input.substring(0, matches.first.start);
-  if (matches.first.start != 0) {
+  final firstNonMatch = input.substring(0, matches.first.start).trim();
+  if (firstNonMatch != '' ) {
     return (
       null,
       'error parsing datesByMonth, the input is expected to start by a month but it starts with $firstNonMatch. \nThe parsed input is $input',
@@ -47,7 +47,7 @@ final String monthRe = '(?:${months.keys.join('|')})';
         ? matches[i + 1].start
         : input.length;
 
-    final nonMatchText = input.substring(endOfCurrentMatch, startOfNextMatch);
+    final nonMatchText = input.substring(endOfCurrentMatch, startOfNextMatch).trim();
 
     pairs.add((month, nonMatchText));
   }
