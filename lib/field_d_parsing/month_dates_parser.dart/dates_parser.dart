@@ -2,7 +2,10 @@ import 'dart:math';
 
 import '../range_v2_producer.dart';
 
-(List<int>, String?) getDatesFrom(List<XRangeV2> dateTokens) {
+(List<int>?, String?) getDatesFrom(List<XRangeV2> dateTokens) {
+  if (dateTokens.isEmpty) {
+    return (null, 'error in getDatesFrom, argument dateTokens is empty');
+  }
   final res = <int>[];
   for (var element in dateTokens) {
     if (element is Date2Range) {
@@ -42,18 +45,3 @@ import '../range_v2_producer.dart';
   return (res, null);
 }
 
-
-/* 
-
-class Date2Range extends X2RangeV2 {
-  Date2Range(super.startToken, super.endToken);
-  @override
-  String toString() {
-    return 'Date2Range($startToken-$endToken)';
-  }
-}
-
-/// range for 1 Number only
-class LoneNumber 
-
- */

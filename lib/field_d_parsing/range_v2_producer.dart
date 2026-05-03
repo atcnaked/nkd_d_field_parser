@@ -1,29 +1,6 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'my_token_class_tokenizer.dart';
 
-   const Map<String, int> months = {
-    'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6, 
-    'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12
-  };
-
-   final String monthRe = '(?:${months.keys.join('|')})';
-
-List<(String, String)> splitByMonth(String? source) {
-  String originalString =source?? "Hello 123, this is Flutter 456!";
-  RegExp numberRegex = RegExp(r'\d+');
-
-  // Rebuilding the string
-  String rebuiltString = originalString.splitMapJoin(
-    numberRegex,
-    // What to do with the parts that MATCH the regex
-    onMatch: (Match m) => m.group(0)!, 
-    // What to do with the parts that DON'T match (the text between matches)
-    onNonMatch: (String nonMatch) => nonMatch, 
-  );
-
-  print(originalString == rebuiltString); // true
-}
-
 
 /// take a rule of a schedule element and convert token combination into ranges in several pass.
 (List<XRangeV2>?, String?) gatherAndProduceRangeLikeV2(List<MyToken> tokenizeds) {
