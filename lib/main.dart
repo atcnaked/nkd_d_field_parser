@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'field_d_parsing/parser1.dart';
+import 'd_field_lists/retrieve_ds_from_examples.dart';
 
 void main() {
   runApp(const MyApp());
@@ -54,6 +55,12 @@ class _MyHomePageState extends State<MyHomePage> {
               },
               child: Text('parse Ds'),
             ),
+            ElevatedButton(
+              onPressed: () {
+                retrieveDfromExamples();
+              },
+              child: Text('retrieve Ds from Examples'),
+            ),
             const Text('You have pushed the button this many times:'),
             Text(
               '$_counter',
@@ -70,3 +77,4 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
+

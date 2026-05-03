@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
+
 import 'range_producer.dart';
 
-Map<DateTime, List<DateTime>> getDecodedOf(
+Map<DateTime, List<TimeOfDay>> getDecodedOf(
   List<XRange> ranges,
   DateTime b,
   DateTime c,

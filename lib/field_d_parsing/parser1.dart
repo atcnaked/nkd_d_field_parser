@@ -1,8 +1,9 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'decoded_rules.dart';
+//import 'decoded_rules.dart';
 import 'examples_var.dart';
 import 'my_token_class_tokenizer.dart';
 import 'range_producer.dart';
+//import 'range_v2_producer.dart';
 
  parseLines() {
   // adding space around hyphens so that they are isolated after sanitization
@@ -69,20 +70,20 @@ import 'range_producer.dart';
         'List<MyToken> tokenizedExclusions = ${tokenizedExclusions.$1.join(' ')}',
       );
 
-
-      final (List<XRange>?, String?) xRangesResult = gatherAndProduceRange(
+/* 
+      final (List<XRangeV2>?, String?) xRangesLikeResult = gatherAndProduceRangeLikeV2(
         tokenizedRules.$1,
       );
 
       
-      if (xRangesResult.$2 != null) {
-        print('error in gatherAndProduceRange: ${xRangesResult.$2}');
+      if (xRangesLikeResult.$2 != null) {
+        print('error in gatherAndProduceRange: ${xRangesLikeResult.$2}');
       }
       print('\n(recall) handling line: $line');
 
-      print('OK gatherAndProduceRange: ${xRangesResult.$1}');
+      print('OK gatherAndProduceRange: ${xRangesLikeResult.$1}');
 
-
+ */
 //////////////////////////////
 //////////////////////////////
 
@@ -109,7 +110,7 @@ import 'range_producer.dart';
       }
       final DateTime B = DateTime(2026);
       final DateTime C= DateTime(2026);
-      final Map<DateTime,List<DateTime>> decodedRules = getDecodedOf(ranges,B,C);
+    //  final Map<DateTime,List<DateTime>> decodedRules = getDecodedOf(ranges,B,C);
 //////////////////////////////
 //////////////////////////////
 //////////////////////////////
