@@ -16,9 +16,14 @@ const Map<String, int> months = {
 final String monthRe = '(?:${months.keys.join('|')})';
 
 /// a list of records of a month followed by a string (expected to be interpreted as dates).
-(List<(String, String)>?, String?) datesByMonth(String? source) {
-  final String input = source ?? "Hello 123, this is Flutter 456!";
-  final RegExp regex = RegExp('$monthRe');
+/// 
+/// if no month found returns ([], null)
+/// It can parse Month in isolated dates
+(List<(String, String)>?, String?) datesByMonth(String input) {
+ if (input.isEmpty) {
+   return (null, 'erro in datesByMonth, input is empty');
+ }
+  final RegExp regex = RegExp(monthRe);
 
   final matches = regex.allMatches(input).toList();
 

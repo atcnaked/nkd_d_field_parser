@@ -36,7 +36,7 @@ import 'my_token_class_tokenizer.dart';
   // some transformed token will be transformed into null as they will be taken into account inside another 
   
   final List<(MyToken?, XRangeV2?)> myTokenOrXRangeList = tokenizeds
-      // if you do not do (e, null) as (MyToken?, XRange?) then the type of the list is (MyToken, Null) meading to error:
+      // if you do not do (e, null) as (MyToken?, XRange?) then the type of the list is (MyToken, Null) leading to error:
       // _TypeError (type '(Null, Null)' is not a subtype of type '(MyToken, Null)' of 'value')
       .map((e) => (e, null) as (MyToken?, XRangeV2?))
       .toList();
@@ -176,7 +176,7 @@ XRangeV2 loneRangeFrom(MyToken theToken) {
     return MonthRange(theToken);
   }
   if (theToken is WeekDayLyToken) {
-    return WeekDayLyRange(theToken, theToken);
+    return WeekDayLyRange(theToken as WeekDayLyToken, theToken as WeekDayLyToken);
   }
   return ErrorXRange(theToken, 'incorrect type error: ${theToken.runtimeType}');
 }
@@ -205,10 +205,7 @@ sealed class X1RangeV2 extends XRangeV2 {}
 sealed class X4Range extends XRangeV2 {}
 
 sealed class X2RangeV2 extends XRangeV2 {
-  final MyToken startToken;
-  final MyToken endToken;
 
-  X2RangeV2(this.startToken, this.endToken);
 }
 
 /// the ultimate purpose is to produce a Map date YMD => List TP.
@@ -228,16 +225,19 @@ sealed class X2RangeV2 extends XRangeV2 {
 /// ActiveDatesTimePeriod are TP that start and end on different days
 sealed class ActiveDatesTimePeriod extends XRangeV2 {}
 
- class WeekDayLyToken extends ActiveDatesTimePeriod {
+ class WeekDayLyTokenTimePeriod extends ActiveDatesTimePeriod {
 
   final WeekDayLyToken startWeekDay;
   final HourToken startHour;
   final WeekDayLyToken endWeekDay;
   final HourToken endHour;
 
+  WeekDayLyTokenTimePeriod(this.startWeekDay, this.startHour, this.endWeekDay, this.endHour);
+
  }
- /// MonthDatesTimePeriod have an optional month that will be found later with the context
+ /// MonthDatesTimePeriod have an optional months that will be found later with the context
  /// 
+ /// if a month is null it means it must be infered from context
  /// Year will always be from context
  class MonthDatesTimePeriod extends ActiveDatesTimePeriod {
   final MonthToken? startMonth ;
@@ -247,7 +247,29 @@ sealed class ActiveDatesTimePeriod extends XRangeV2 {}
   final TwoDigitToken endDayNumber;
   final HourToken endHour;
 
+  MonthDatesTimePeriod(this.startMonth, this.startDayNumber, this.startHour, this.endMonth, this.endDayNumber, this.endHour);
+
 }
+/* 
+/// use month as start end Token and repeat them in the fields
+class DayOrWeekDayHourRange extends X4Range {
+  final MyToken startDToken;
+  final HourToken startHToken;
+  final MyToken endDToken;
+  final HourToken endHToken;
+  DayOrWeekDayHourRange({
+    required this.startDToken,
+    required this.startHToken,
+    required this.endDToken,
+    required this.endHToken,
+  }); 
+
+  @override
+  String toString() {
+    return 'DayOrWeekDayHourRange($startDToken $startHToken -> $endDToken $endHToken)';
+  }
+}
+  */
 
 /// TP TimePeriod represents 0800-1000. 
 /// To be used with DatesSelector in order to produce Lis
@@ -260,6 +282,7 @@ TimePeriod(this.startHour, this.endHour);
     return 'TP($startHour-$endHour)';
   }
 }
+/* 
 /// TP TimePeriod represents 0800-1000
 class TimePeriod extends XRangeV2 {
   final HourToken startToken;
@@ -273,16 +296,20 @@ class TimePeriod extends XRangeV2 {
   String toString() {
     return 'TP($startToken-$endToken)';
   }
-}
+} */
 
 /// range build from days of 1 or 2 digits.
 ///
 /// When it deals with one day, use set endToken = startToken
 class Date2Range extends X2RangeV2 {
-  Date2Range(super.startToken, super.endToken);
+  
+  final TwoDigitToken start;
+  final TwoDigitToken end;
+    Date2Range(this.start, this.end);
+
   @override
   String toString() {
-    return 'Date2Range($startToken-$endToken)';
+    return 'Date2Range($start-$end)';
   }
 }
 
@@ -306,24 +333,7 @@ class MonthRange extends X1RangeV2 {
   }
 }
 
-/// use month as start end Token and repeat them in the fields
-class DayOrWeekDayHourRange extends X4Range {
-  final MyToken startDToken;
-  final HourToken startHToken;
-  final MyToken endDToken;
-  final HourToken endHToken;
-  DayOrWeekDayHourRange({
-    required this.startDToken,
-    required this.startHToken,
-    required this.endDToken,
-    required this.endHToken,
-  });
 
-  @override
-  String toString() {
-    return 'DayOrWeekDayHourRange($startDToken $startHToken -> $endDToken $endHToken)';
-  }
-}
 
 /// use month as start end Token and repeat them in the fields
 class MonthDayRange extends X4Range {
@@ -345,12 +355,25 @@ class MonthDayRange extends X4Range {
   }
 }
 
-/// a range build from WeekDayLyToken
-class WeekDayLyRange extends X2RangeV2 {
-  WeekDayLyRange(super.startToken, super.endToken);
+/// range for 1 weekday only
+class LoneWeekDayRange extends X1RangeV2 {
+  final WeekDayLyToken weekDayLyToken;
+
+  LoneWeekDayRange(this.weekDayLyToken);
   @override
   String toString() {
-    return 'WeekDayLyRange($startToken-$endToken)';
+    return 'LoneWeekDayRange($weekDayLyToken)';
+  }
+}
+
+/// a range build from WeekDayLyToken
+class WeekDayLyRange extends X2RangeV2 {
+  final WeekDayLyToken start;
+  final WeekDayLyToken end;
+  WeekDayLyRange(this.start, this.end);
+  @override
+  String toString() {
+    return 'WeekDayLyRange($start-$end)';
   }
 }
 
