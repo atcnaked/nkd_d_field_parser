@@ -120,6 +120,10 @@ class NotamSchedule {
       '(?:($monthRe) )?($dateRe) ($timeReNoCG)';
   static final String datetimeRangeReNoCG = '$datetimeReNoCG-$datetimeReNoCG';
 
+  // AI fix: to Match "MON 1000-FRI 1200"
+  static final String dayTimeRangeRe =
+      '(?<startDay>$dayRe) (?<startTime>$timeReNoCG)-(?<endDay>$dayRe) (?<endTime>$timeReNoCG)';
+  //
   static const AixmRange<AixmTime> h24 = AixmRange(
     AixmTime.beginningOfDay,
     AixmTime.endOfDay,
@@ -181,6 +185,14 @@ class NotamSchedule {
 
     // Example usage:
     // pattern.hasMatch('JAN 15 1430-FEB 28 SR PLUS30'); // Returns true
+
+    // NEW, AI fix: Handle OPADD Example 8 (Continuous multi-day block using Days)
+    final dayTimeMatch = RegExp('^$dayTimeRangeRe\$').firstMatch(rules);
+    if (dayTimeMatch != null) {
+      return _parseDaytimeRange(dayTimeMatch, exceptions, normalizedBaseDate);
+    }
+    //
+
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
       //if (datetimeRangeRePatternWOCaptureGroup.hasMatch(rules)) {
       print('CASE 1');
@@ -233,9 +245,23 @@ class NotamSchedule {
         ? _daysFrom(rawActiveUnit)
         : _datesFrom(rawActiveUnit, baseDate);
     final times = _timesFrom(rawTimes);
+    /* 
+// original
     final inactives = isDays
         ? _datesFrom(exceptions, baseDate)
         : _daysFrom(exceptions);
+ */
+    // AI fix:
+    List<dynamic> inactives = [];
+    if (exceptions.isNotEmpty) {
+      // If the exception contains a 3-letter day (MON, TUE, etc.), parse it as Days.
+      // Otherwise, parse it as Dates.
+      if (RegExp(dayRe).hasMatch(exceptions)) {
+        inactives = _daysFrom(exceptions);
+      } else {
+        inactives = _datesFrom(exceptions, baseDate);
+      }
+    }
 
     List<NotamSchedule> results = [];
 
@@ -288,6 +314,51 @@ class NotamSchedule {
 
     return results;
   }
+  /// AI fix: 
+static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptions, DateTime baseDate) {
+    final startDayStr = match.namedGroup('startDay')!;
+    final startTimeStr = match.namedGroup('startTime')!;
+    final endDayStr = match.namedGroup('endDay')!;
+    final endTimeStr = match.namedGroup('endTime')!;
+
+    // 1. Convert day strings (MON, TUE) to Dart weekday integers (1=Mon, 7=Sun)
+    final startWeekday = _dayStringToWeekday(startDayStr);
+    final endWeekday = _dayStringToWeekday(endDayStr);
+
+    // 2. Map the weekdays to actual DateTimes relative to the baseDate
+    DateTime startDate = _nextWeekday(baseDate, startWeekday);
+    DateTime endDate = _nextWeekday(startDate, endWeekday); 
+    
+    // If they are the same day (e.g. MON 1000 - MON 1800), push the end date forward a week 
+    // assuming it's a multi-day block. (Though normally this is just written MON 1000-1800)
+    if (startDate.isAtSameMomentAs(endDate)) {
+        endDate = endDate.add(const Duration(days: 7));
+    }
+
+    // 3. Package them into the format _parseDatetimes expects and reuse that logic!
+    // We format them back into pseudo-strings like "01 1000-05 1200" so we don't have to duplicate code.
+    final pseudoRules = "${startDate.day.toString().padLeft(2, '0')} $startTimeStr-${endDate.day.toString().padLeft(2, '0')} $endTimeStr";
+    
+    return _parseDatetimes(pseudoRules, exceptions, startDate);
+  }
+
+  // Helper to map "MON" to 1, "TUE" to 2, etc.
+  static int _dayStringToWeekday(String day) {
+    const map = {'MON': 1, 'TUE': 2, 'WED': 3, 'THU': 4, 'FRI': 5, 'SAT': 6, 'SUN': 7};
+    return map[day] ?? 1;
+  }
+
+  // Helper to find the exact DateTime of the next occurring specific weekday
+  static DateTime _nextWeekday(DateTime from, int targetWeekday) {
+    int distance = targetWeekday - from.weekday;
+    if (distance < 0) {
+      distance += 7; // It's next week
+    }
+    return from.add(Duration(days: distance));
+  }
+
+  ///
+
 
   static List<NotamSchedule> _parseDatetimes(
     String rules,
@@ -428,9 +499,7 @@ class NotamSchedule {
         // Advance the index by the length of the matched string
         //  index += remainingTrimmed.length - remainingTrimmed.substring(rangeMatch.end).length;
         // my fix:
-        index +=
-            remainingNotTrimmed.length -
-            remaining.substring(rangeMatch.end).length;
+        //  index +=            remainingNotTrimmed.length -            remaining.substring(rangeMatch.end).length;
 
         // AI fix:
         index += spacesSkipped + rangeMatch.end;
@@ -453,9 +522,7 @@ class NotamSchedule {
         );
         // my fix:
 
-        index +=
-            remainingNotTrimmed.length -
-            remaining.substring(dateMatch.end).length;
+        // index +=  remainingNotTrimmed.length - remaining.substring(dateMatch.end).length;
 
         // Advance the reading head
         index += spacesSkipped + dateMatch.end; // AI fix:
@@ -469,16 +536,16 @@ class NotamSchedule {
         final newMonth = months[monthMatch.namedGroup('month')!]!;
         // Shift the baseDate forward to this new month!
         baseDate = DateTime(baseDate.year, newMonth, 1);
-        index +=
-            remainingNotTrimmed.length -
-            remaining.substring(monthMatch.end).length;
+        // index += remainingNotTrimmed.length - remaining.substring(monthMatch.end).length;
 
         // Advance the reading head
         index += spacesSkipped + monthMatch.end; // AI fix:
         continue;
       }
 
-      throw FormatException('Unrecognized date formatting at: $remaining');
+      throw FormatException(
+        'Unrecognized date formatting at: $remaining in string: $string',
+      );
     }
 
     return array;

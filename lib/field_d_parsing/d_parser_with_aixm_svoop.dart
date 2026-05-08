@@ -12,10 +12,20 @@ void svoop01() {
   final dFields4 = ['SUN H24'];
   final dFieldsError = ['0830-1600 EXC SAT'];
 
-  final dCheckingList = dCheckingString
+  final dCheckingListWOD = dCheckingString
       .split('D)')
       .map((e) => e.trim())
       .toList();
+
+
+  final dCheckingList = [];
+  for (var lineWithComma in dCheckingListWOD) {
+    final commaParts = lineWithComma.split(',').map((e)=>e.trim()).toList();
+      dCheckingList.addAll(commaParts);
+   
+  }
+
+
 String parsed ='';
 final len = dCheckingList.length;
 int counter = 1;
