@@ -1,6 +1,3 @@
-import '../my_token_class_tokenizer.dart';
-import '../range_v2_producer.dart';
-
 const Map<String, int> months = {
   'JAN': 1,
   'FEB': 2,
@@ -15,44 +12,6 @@ const Map<String, int> months = {
   'NOV': 11,
   'DEC': 12,
 };
-
-// we unflatten the list of Token into montoken and List token
-(
-List< (LoneMonthRange, List<XRangeV2>)>?, String?)? dayRangeByMonth(List <XRangeV2> ranges){ 
-  
-  return null;
-  // List<XRangeV2>
-final List< (LoneMonthRange, List<XRangeV2>)> resultList =[] ;
-final List <XRangeV2> dayRanges = [];
-for (final range in ranges) {
-  if (range is LoneMonthRange) {
-    resultList.add( ( range , [...dayRanges] ));
-    dayRanges.clear();
-  } else if (range is LoneNumberRange || range is Date2Range) {
-    dayRanges.add(range);
-  } else {
-    return (null,'error in dayRangeByMonth, ');
-  }
-}
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 final String monthRe = '(?:${months.keys.join('|')})';
 

@@ -9,8 +9,8 @@ import '../range_v2_producer.dart';
   final res = <int>[];
   for (var element in dateTokens) {
     if (element is Date2Range) {
-      final int? start = int.tryParse(element.startToken.word);
-      final int? end = int.tryParse(element.endToken.word);
+      final int? start = int.tryParse(element.start.word);
+      final int? end = int.tryParse(element.end.word);
       //       if (start == null || end == null) {
       if (start == null || end == null) {
         return (
@@ -20,7 +20,7 @@ import '../range_v2_producer.dart';
       }
       final List<int> enumerateds = enumeratedsFrom(start, end);
       res.addAll(enumerateds);
-    } else if (element is LoneNumber) {
+    } else if (element is LoneNumberRange) {
       final int? dateNb = int.tryParse(element.twoDigitToken.word);
       if (dateNb == null) {
         return (
@@ -41,7 +41,7 @@ import '../range_v2_producer.dart';
   }
   return (res, null);
 }
-
+/// the List of Int from start to end included (with end>= start)
 List<int> enumeratedsFrom(int start, int end) {
   return [for (var i = start; i < end + 1; i++) i];
   /*  final enumerateds = <int>[];

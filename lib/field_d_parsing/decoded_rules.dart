@@ -17,29 +17,22 @@ Map<DateTime, List<TimeOfDay>> getDecodedOf(
   int year = b.year;
   int month = b.month;
   for (var xRange in ranges) {
-// if TimeRange ...
-// if date or date range
-if (xRange is Date2Range) {
-  ruleDates.add(datesFromDate2Range(xRange, year, month));
-  continue;
-}
-if (xRange is MonthDayRange) {
-  ruleDates.add(datesFromMonthDayRange(xRange, year, month));
-
-}
-if (xRange is WeekDayLyRange) {
-  ruleDates.add(datesFromWeekDayLyRange(xRange, year, month));
-}
-
-  
-}
-
-
-
-
-
+    // if TimeRange ...
+    // if date or date range
+    if (xRange is Date2Range) {
+      // ruleDates.add(datesFromDate2Range(xRange, year, month));
+      continue;
+    }
+    if (xRange is MonthDayRange) {
+      // ruleDates.add(datesFromMonthDayRange(xRange, year, month));
+    }
+    if (xRange is WeekDayLyRange) {
+      // ruleDates.add(datesFromWeekDayLyRange(xRange, year, month));
+    }
   }
+  return {};
 }
 
 List<DateTime> allDatesFrom(DateTime b, DateTime c) {
+  return [];
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'field_d_parsing/d_parser_with_aixm_svoop.dart';
 import 'field_d_parsing/parser1.dart';
 import 'd_field_lists/retrieve_ds_from_examples.dart';
 
@@ -60,6 +61,13 @@ class _MyHomePageState extends State<MyHomePage> {
                 retrieveDfromExamples();
               },
               child: Text('retrieve Ds from Examples'),
+            ),
+            
+            ElevatedButton(
+              onPressed: () {
+                svoop01();
+              },
+              child: Text('svoop parse D'),
             ),
             const Text('You have pushed the button this many times:'),
             Text(
