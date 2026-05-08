@@ -116,6 +116,7 @@ class NotamSchedule {
   static final String timeReNoCG = '(?:$hourReNoCG|$eventReNoCG)';
   static final String timeRangeReNoCG =
       '(?:$timeReNoCG-$timeReNoCG|$hcodeReNoCG)';
+
   static final String datetimeReNoCG =
       '(?:($monthRe) )?($dateRe) ($timeReNoCG)';
   static final String datetimeRangeReNoCG = '$datetimeReNoCG-$datetimeReNoCG';
@@ -135,7 +136,7 @@ class NotamSchedule {
   static final AixmRange<AixmTime> hn = AixmRange(
     AixmTime.event('sunset'),
     AixmTime.event('sunrise'),
-  ); 
+  );
 
   // 3. Properties
   final List<dynamic> actives; // Array of AixmDate, AixmDay, or AixmRange
@@ -169,13 +170,13 @@ class NotamSchedule {
 
     // Force day to 1 as per Ruby logic `base_date.at(day: 1)`
     final normalizedBaseDate = DateTime(baseDate.year, baseDate.month, 1);
-    final datetimeRangeRePatternWOCaptureGroup = RegExp(
+    /*   final datetimeRangeRePatternWOCaptureGroup = RegExp(
       r'^(?:(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC) )?(?:[0-2]\d|3[01]) (?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC) )?(?:[0-2]\d|3[01]) (?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)$',
     );
 
     final dayReOrtimeRangeRePatternWOCG = RegExp(
       r'^(?:(?:MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|DLY)|(?:(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)|(?:H24|HJ|HN)))',
-    );
+    ); */
 
     // Example usages:
     // pattern.hasMatch('MON'); // Returns true
@@ -191,6 +192,7 @@ class NotamSchedule {
     if (dayTimeMatch != null) {
       return _parseDaytimeRange(dayTimeMatch, exceptions, normalizedBaseDate);
     }
+    print('CASE 0');
     //
 
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
@@ -226,9 +228,12 @@ class NotamSchedule {
   }) {
     // Split on time range. In Dart, we use a regex match to find where the time starts
 
-    final timeRangeRePatternWOCG = RegExp(
+    /*   final timeRangeRePatternWOCG = RegExp(
       r'(?:(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)|(?:H24|HJ|HN))',
-    );
+    ); */
+
+    /// originally timeRangeRePatternWOCG above was used but it seems timeRangeReNoCG does the same
+    final timeRangeRePatternWOCG = RegExp(timeRangeReNoCG);
 
     // Example usages:
     // pattern.hasMatch('0800-1730'); // Returns true
@@ -236,15 +241,44 @@ class NotamSchedule {
     // pattern.hasMatch('H24'); // Returns true
 
     final timeMatch = timeRangeRePatternWOCG.firstMatch(rules);
-    if (timeMatch == null) throw FormatException('No time found in rules');
+    //if (timeMatch == null) throw FormatException('No time found in rules');
+ final String rawActiveUnit ;
+List<dynamic> times;
+//////////////////////////////////
+// --- THE PRAGMATIC PATCH ---
+    if (timeMatch == null) {
+      // Print a warning to your console so you know the data feed was dirty
+      print('WARNING: Malformed D field rules "$rules". Missing time range. Defaulting to H24.');
+      
+      // Treat the entire rule string as the active days/dates
+      rawActiveUnit = rules.trim();
+      // Force the time bucket to be H24 (00:00 - 23:59)
+      times = [h24]; 
+    } else {
+      // Normal OPADD-compliant processing
+      rawActiveUnit = rules.substring(0, timeMatch.start).trim();
+      final rawTimes = rules.substring(timeMatch.start).trim();
+      times = _timesFrom(rawTimes);
+    }
 
+    // Continue with standard parsing...
+// final actives = isDays ? _daysFrom(rawActiveUnit) : _datesFrom(rawActiveUnit, baseDate);
+/////////////////////////////
+
+
+
+
+
+
+
+/* 
     final rawActiveUnit = rules.substring(0, timeMatch.start).trim();
     final rawTimes = rules.substring(timeMatch.start).trim();
-
+    final times = _timesFrom(rawTimes);
+ */
     final actives = isDays
         ? _daysFrom(rawActiveUnit)
         : _datesFrom(rawActiveUnit, baseDate);
-    final times = _timesFrom(rawTimes);
     /* 
 // original
     final inactives = isDays
@@ -314,8 +348,13 @@ class NotamSchedule {
 
     return results;
   }
-  /// AI fix: 
-static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptions, DateTime baseDate) {
+
+  /// AI fix:
+  static List<NotamSchedule> _parseDaytimeRange(
+    RegExpMatch match,
+    String exceptions,
+    DateTime baseDate,
+  ) {
     final startDayStr = match.namedGroup('startDay')!;
     final startTimeStr = match.namedGroup('startTime')!;
     final endDayStr = match.namedGroup('endDay')!;
@@ -327,24 +366,33 @@ static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptio
 
     // 2. Map the weekdays to actual DateTimes relative to the baseDate
     DateTime startDate = _nextWeekday(baseDate, startWeekday);
-    DateTime endDate = _nextWeekday(startDate, endWeekday); 
-    
-    // If they are the same day (e.g. MON 1000 - MON 1800), push the end date forward a week 
+    DateTime endDate = _nextWeekday(startDate, endWeekday);
+
+    // If they are the same day (e.g. MON 1000 - MON 1800), push the end date forward a week
     // assuming it's a multi-day block. (Though normally this is just written MON 1000-1800)
     if (startDate.isAtSameMomentAs(endDate)) {
-        endDate = endDate.add(const Duration(days: 7));
+      endDate = endDate.add(const Duration(days: 7));
     }
 
     // 3. Package them into the format _parseDatetimes expects and reuse that logic!
     // We format them back into pseudo-strings like "01 1000-05 1200" so we don't have to duplicate code.
-    final pseudoRules = "${startDate.day.toString().padLeft(2, '0')} $startTimeStr-${endDate.day.toString().padLeft(2, '0')} $endTimeStr";
-    
+    final pseudoRules =
+        "${startDate.day.toString().padLeft(2, '0')} $startTimeStr-${endDate.day.toString().padLeft(2, '0')} $endTimeStr";
+
     return _parseDatetimes(pseudoRules, exceptions, startDate);
   }
 
   // Helper to map "MON" to 1, "TUE" to 2, etc.
   static int _dayStringToWeekday(String day) {
-    const map = {'MON': 1, 'TUE': 2, 'WED': 3, 'THU': 4, 'FRI': 5, 'SAT': 6, 'SUN': 7};
+    const map = {
+      'MON': 1,
+      'TUE': 2,
+      'WED': 3,
+      'THU': 4,
+      'FRI': 5,
+      'SAT': 6,
+      'SUN': 7,
+    };
     return map[day] ?? 1;
   }
 
@@ -358,7 +406,6 @@ static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptio
   }
 
   ///
-
 
   static List<NotamSchedule> _parseDatetimes(
     String rules,
