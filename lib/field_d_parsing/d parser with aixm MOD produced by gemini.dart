@@ -135,7 +135,7 @@ class NotamSchedule {
   static final AixmRange<AixmTime> hn = AixmRange(
     AixmTime.event('sunset'),
     AixmTime.event('sunrise'),
-  );
+  ); 
 
   // 3. Properties
   final List<dynamic> actives; // Array of AixmDate, AixmDay, or AixmRange
