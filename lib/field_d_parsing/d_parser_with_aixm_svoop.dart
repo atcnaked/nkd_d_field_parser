@@ -44,6 +44,6 @@ int counter = 1;
       counter++;
     }
   } catch (e) {
-    print('parsing: $parsed, e: $e');
+    print('$e , while parsing: $parsed');
   }
 }
