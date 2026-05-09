@@ -242,18 +242,20 @@ class NotamSchedule {
 
     final timeMatch = timeRangeRePatternWOCG.firstMatch(rules);
     //if (timeMatch == null) throw FormatException('No time found in rules');
- final String rawActiveUnit ;
-List<dynamic> times;
-//////////////////////////////////
-// --- THE PRAGMATIC PATCH ---
+    final String rawActiveUnit;
+    List<dynamic> times;
+    //////////////////////////////////
+    // --- THE PRAGMATIC PATCH ---
     if (timeMatch == null) {
       // Print a warning to your console so you know the data feed was dirty
-      print('WARNING: Malformed D field rules "$rules". Missing time range. Defaulting to H24.');
-      
+      print(
+        'WARNING: Malformed D field rules "$rules". Missing time range. Defaulting to H24.',
+      );
+
       // Treat the entire rule string as the active days/dates
       rawActiveUnit = rules.trim();
       // Force the time bucket to be H24 (00:00 - 23:59)
-      times = [h24]; 
+      times = [h24];
     } else {
       // Normal OPADD-compliant processing
       rawActiveUnit = rules.substring(0, timeMatch.start).trim();
@@ -262,16 +264,9 @@ List<dynamic> times;
     }
 
     // Continue with standard parsing...
-// final actives = isDays ? _daysFrom(rawActiveUnit) : _datesFrom(rawActiveUnit, baseDate);
-/////////////////////////////
-
-
-
-
-
-
-
-/* 
+    // final actives = isDays ? _daysFrom(rawActiveUnit) : _datesFrom(rawActiveUnit, baseDate);
+    /////////////
+    /* 
     final rawActiveUnit = rules.substring(0, timeMatch.start).trim();
     final rawTimes = rules.substring(timeMatch.start).trim();
     final times = _timesFrom(rawTimes);
@@ -511,7 +506,8 @@ List<dynamic> times;
   static List<dynamic> _datesFrom(String string, DateTime baseDate) {
     if (string.isEmpty) return [];
     List<dynamic> array = [];
-
+    // Memory to track the last date we parsed for chronological validation
+    DateTime? previousDate;
     int index = 0;
     while (index < string.length) {
       // Get the remaining string and strip leading spaces
@@ -535,13 +531,26 @@ List<dynamic> times;
         final startMonth = baseDate.month;
         // If the range has a month (e.g. 30-FEB 02), shift the end month!
         final endMonth = monthStr != null ? months[monthStr]! : baseDate.month;
+        final startDate = DateTime(baseDate.year, startMonth, fromDay);
+        final endDate = DateTime(baseDate.year, endMonth, toDay);
+        // --- THE CHRONOLOGICAL CHECK ---
+        if (previousDate != null && startDate.isBefore(previousDate)) {
+          print(
+            '\nWARNING: OPADD Violation: Dates are not in chronological order ("$fromDay" appears after a later date) in string: $string.\n',
+          );
+        }
+        // Update the tracker to the end of the range
+        previousDate = endDate;
 
+        array.add(AixmRange(AixmDate(startDate), AixmDate(endDate)));
+        /* 
         array.add(
           AixmRange(
             AixmDate(DateTime(baseDate.year, startMonth, fromDay)),
             AixmDate(DateTime(baseDate.year, endMonth, toDay)),
           ),
         );
+ */
 
         // Advance the index by the length of the matched string
         //  index += remainingTrimmed.length - remainingTrimmed.substring(rangeMatch.end).length;
@@ -558,7 +567,19 @@ List<dynamic> times;
       // Matches: "15" or "01"
       final dateMatch = RegExp('^(?<day>$dateRe)').firstMatch(remaining);
       if (dateMatch != null) {
-        array.add(
+        final currentDay = int.parse(dateMatch.namedGroup('day')!);
+        final currentDate = DateTime(baseDate.year, baseDate.month, currentDay);
+
+        // --- THE CHRONOLOGICAL CHECK ---
+        if (previousDate != null && currentDate.isBefore(previousDate)) {
+          print(
+            '\nWARNING: OPADD Violation: Dates are not in chronological order ("$currentDay" appears after a later date) in string: $string.\n',
+          );
+        }
+        // Update the tracker
+        previousDate = currentDate;
+
+        /*    array.add(
           AixmDate(
             DateTime(
               baseDate.year,
@@ -566,7 +587,7 @@ List<dynamic> times;
               int.parse(dateMatch.namedGroup('day')!),
             ),
           ),
-        );
+        ); */
         // my fix:
 
         // index +=  remainingNotTrimmed.length - remaining.substring(dateMatch.end).length;
