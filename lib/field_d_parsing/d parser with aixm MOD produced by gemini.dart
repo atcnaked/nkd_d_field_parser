@@ -1,4 +1,7 @@
-import 'package:collection/collection.dart'; // Used for sliceWhen equivalent
+import 'dart:developer';
+
+import 'package:collection/collection.dart';
+import 'package:flutter/material.dart'; // Used for sliceWhen equivalent
 
 /// --- MOCK AIXM CLASSES ---
 /// These classes mimic the behavior of the Ruby AIXM gem used in the original script
@@ -158,10 +161,11 @@ class NotamSchedule {
 
   // --- PARSING LOGIC ---
 
-  /// Parse the schedule part of a D item.
-  /// 
-  /// It parses a schedule elements which are the D field comma separated part
-  /// A schedule element has rules and optional exceptions.
+  /// Parse a schedule elements.
+  ///
+  /// It parses a schedule elements which are the comma separated part (of the D field)
+  /// Sometimes they may be called 'block' or 'schedule block'
+  /// A schedule element has rules and optionally exceptions/exclusions.
   static List<NotamSchedule> parse(
     String string, {
     required DateTime baseDate,
@@ -181,7 +185,7 @@ class NotamSchedule {
       r'^(?:(?:MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|DLY)|(?:(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)|(?:H24|HJ|HN)))',
     ); */
 
-   /// print('CASE 0');
+    /// print('CASE 0');
     // AI fix: Handle OPADD Example 8 (Continuous multi-day block using Days)
     // matches TimeRange with weekdays: MON 1100-FRI 1100
     final dayTimeMatch = RegExp('^$dayTimeRangeRe\$').firstMatch(rules);
@@ -190,17 +194,17 @@ class NotamSchedule {
     }
     // matches TimeRange with dates (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
-     // print('CASE 1');
+      // print('CASE 1');
       return _parseDatetimes(rules, exceptions, normalizedBaseDate);
     } else
     // matches weekdays or simple TimeRange : SUN or 1430-SR PLUS30
     if (RegExp('^($dayRe|$timeRangeReNoCG)').hasMatch(rules)) {
-    //  print('CASE 2');
+      //  print('CASE 2');
 
-    // matchesremaing dates (with or without month): Mar 4 13-15 APR 6
+      // matchesremaing dates (with or without month): Mar 4 13-15 APR 6
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: true);
     } else if (RegExp('^($dateRe|$monthRe)').hasMatch(rules)) {
-     // print('CASE 3');
+      // print('CASE 3');
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: false);
     } else {
       throw FormatException('Unrecognized schedule: $rules');
@@ -338,7 +342,12 @@ class NotamSchedule {
 
     return results;
   }
-static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptions, DateTime baseDate) {
+
+  static List<NotamSchedule> _parseDaytimeRange(
+    RegExpMatch match,
+    String exceptions,
+    DateTime baseDate,
+  ) {
     final startDayStr = match.namedGroup('startDay')!;
     final startTimeStr = match.namedGroup('startTime')!;
     final endDayStr = match.namedGroup('endDay')!;
@@ -354,28 +363,69 @@ static List<NotamSchedule> _parseDaytimeRange(RegExpMatch match, String exceptio
     // Parse the exceptions cleanly using our smart logic
     List<dynamic> inactives = [];
     if (exceptions.isNotEmpty) {
-      inactives = RegExp(dayRe).hasMatch(exceptions) 
-          ? _daysFrom(exceptions) 
+      inactives = RegExp(dayRe).hasMatch(exceptions)
+          ? _daysFrom(exceptions)
           : _datesFrom(exceptions, baseDate);
     }
-    
+
     final List<NotamSchedule> results = [];
 
     // --- EDGE CASE: Same Day (e.g., MON 1000 - MON 1800) ---
     // (If they wrote it this way instead of the standard MON 1000-1800)
-    if (startWeekday == endWeekday ) {
-    // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
-    // We could try to check if startTimeStr and endTimeStr are numbers
-    throw Exception('Parse limitation Error: Parser is unable to check whether startTimeStr: $startTimeStr is before endTimeStr: $endTimeStr in ${match.input} \nso it can not tell if the activity spans over one day or over nealy one week');
-      results.add(NotamSchedule._(
-        actives: [AixmDay(startDayStr)],
-        times: [AixmRange(startTime, endTime)],
-        inactives: inactives,
-        baseDate: baseDate,
-      ));
+    if (startWeekday == endWeekday) {
+      final int startHourInt;
+      final int startMinuteInt;
+      final int endHourInt;
+      final int endMinuteInt;
+      try {
+        startHourInt = int.parse(startTimeStr.substring(0, 2));
+        startMinuteInt = int.parse(startTimeStr.substring(2, 4));
+        endHourInt = int.parse(endTimeStr.substring(0, 2));
+        endMinuteInt = int.parse(endTimeStr.substring(2, 4));
+
+        final myStartTime = startHourInt * 60 + startMinuteInt;
+        final myEndTime = endHourInt * 60 + endMinuteInt;
+        if (myStartTime < myEndTime) {
+            // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
+        print(
+          'WARNING: ${match.input} violates OPADD rules but was accepted as "$startDayStr $startTimeStr-$endTimeStr"',
+        );
+          results.add(
+            NotamSchedule._(
+              actives: [AixmDay(startDayStr)],
+              times: [AixmRange(startTime, endTime)],
+              inactives: inactives,
+              baseDate: baseDate,
+            ),
+          );
+          return results;
+        }
+      } catch (e) {
+      log('_parseDaytimeRange time parsing error: $e');
+      }
+
+      // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
+      // We could try to check if startTimeStr and endTimeStr are numbers
+      throw Exception(
+        '''Parser limitation Error: OPADD rules allows ${match.input} which represents an activity that spans over nearly one week.
+        However this parser is only able to parse day range up to 6 days, not 7 days.''',
+      );
+
+      /* 
+      this parser is unable to check whether startTimeStr: $startTimeStr is 
+    before endTimeStr: $endTimeStr in ${match.input} \nso it can not tell if 
+    the activity spans over one day or over nealy one week
+       */
+      results.add(
+        NotamSchedule._(
+          actives: [AixmDay(startDayStr)],
+          times: [AixmRange(startTime, endTime)],
+          inactives: inactives,
+          baseDate: baseDate,
+        ),
+      );
       return results;
     }
-
 
     /* 
     
@@ -399,49 +449,59 @@ try {
     // --- STANDARD MULTI-DAY BLOCK (e.g., MON 1000 - FRI 1200) ---
 
     // Block 1: The Start Day (From start time until 23:59)
-    results.add(NotamSchedule._(
-      actives: [AixmDay(startDayStr)],
-      times: [AixmRange(startTime, AixmTime.endOfDay)], // 23:59
-      inactives: inactives,
-      baseDate: baseDate,
-    ));
+    results.add(
+      NotamSchedule._(
+        actives: [AixmDay(startDayStr)],
+        times: [AixmRange(startTime, AixmTime.endOfDay)], // 23:59
+        inactives: inactives,
+        baseDate: baseDate,
+      ),
+    );
 
     // Block 2: The Middle Days (H24)
     final middleDays = _getIntermediateWeekdays(startWeekday, endWeekday);
     if (middleDays.isNotEmpty) {
-      results.add(NotamSchedule._(
-        actives: middleDays.map((dayInt) => AixmDay( _dayIntToStringWeekday(dayInt))).toList(),
-        times: [h24], // 00:00 - 23:59
-        inactives: inactives,
-        baseDate: baseDate,
-      ));
+      results.add(
+        NotamSchedule._(
+          actives: middleDays
+              .map((dayInt) => AixmDay(_dayIntToStringWeekday(dayInt)))
+              .toList(),
+          times: [h24], // 00:00 - 23:59
+          inactives: inactives,
+          baseDate: baseDate,
+        ),
+      );
     }
 
     // Block 3: The End Day (From 00:00 until end time)
-    results.add(NotamSchedule._(
-      actives: [AixmDay(endTimeStr)],
-      times: [AixmRange(AixmTime.beginningOfDay, endTime)], // 00:00
-      inactives: inactives,
-      baseDate: baseDate,
-    ));
+    results.add(
+      NotamSchedule._(
+        actives: [AixmDay(endTimeStr)],
+        times: [AixmRange(AixmTime.beginningOfDay, endTime)], // 00:00
+        inactives: inactives,
+        baseDate: baseDate,
+      ),
+    );
 
     return results;
-}
+  }
 
   // Helper to find all days strictly between a start and end day
   // e.g., MON (1) to FRI (5) returns [2, 3, 4] (TUE, WED, THU)
   // e.g., FRI (5) to TUE (2) returns [6, 7, 1] (SAT, SUN, MON)
   static List<int> _getIntermediateWeekdays(int start, int end) {
-   final  List<int> days = [];
-    int current = (start % 7) + 1; // Step forward 1 day (wrapping Sunday(7) to Monday(1))
-    
+    final List<int> days = [];
+    int current =
+        (start % 7) + 1; // Step forward 1 day (wrapping Sunday(7) to Monday(1))
+
     while (current != end) {
       days.add(current);
       current = (current % 7) + 1;
     }
-    
+
     return days;
   }
+
   /// AI fix:
   static List<NotamSchedule> _parseDaytimeRangeOld(
     RegExpMatch match,
@@ -489,25 +549,26 @@ try {
     };
     return map[day] ?? 1;
   }
-  
+
   // Helper to map 1 to "MON", 2 to "TUE", etc.
   static String _dayIntToStringWeekday(int intDay) {
     const map = {
-      1:'MON',
-      2:'TUE',
-      3:'WED',
-      4:'THU',
-      5:'FRI',
-      6:'SAT',
-      7:'SUN',
+      1: 'MON',
+      2: 'TUE',
+      3: 'WED',
+      4: 'THU',
+      5: 'FRI',
+      6: 'SAT',
+      7: 'SUN',
     };
-    final res= map[intDay];
-    if (res==null) {
-      throw Exception('could not get corresponding day from intDay: $intDay in _dayStringToWeekday');
+    final res = map[intDay];
+    if (res == null) {
+      throw Exception(
+        'could not get corresponding day from intDay: $intDay in _dayStringToWeekday',
+      );
     }
-    return res ;
+    return res;
   }
-
 
   // Helper to find the exact DateTime of the next occurring specific weekday
   static DateTime _nextWeekday(DateTime from, int targetWeekday) {
