@@ -185,26 +185,28 @@ class NotamSchedule {
       r'^(?:(?:MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|DLY)|(?:(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)|(?:H24|HJ|HN)))',
     ); */
 
-    /// print('CASE 0');
+     print('CASE START');
     // AI fix: Handle OPADD Example 8 (Continuous multi-day block using Days)
     // matches TimeRange with weekdays: MON 1100-FRI 1100
     final dayTimeMatch = RegExp('^$dayTimeRangeRe\$').firstMatch(rules);
     if (dayTimeMatch != null) {
+     print('CASE 0');
       return _parseDaytimeRange(dayTimeMatch, exceptions, normalizedBaseDate);
     }
     // matches TimeRange with dates (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
-      // print('CASE 1');
+       print('CASE 1');
       return _parseDatetimes(rules, exceptions, normalizedBaseDate);
     } else
+    
     // matches weekdays or simple TimeRange : SUN or 1430-SR PLUS30
     if (RegExp('^($dayRe|$timeRangeReNoCG)').hasMatch(rules)) {
-      //  print('CASE 2');
+        print('CASE 2');
 
       // matchesremaing dates (with or without month): Mar 4 13-15 APR 6
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: true);
     } else if (RegExp('^($dateRe|$monthRe)').hasMatch(rules)) {
-      // print('CASE 3');
+       print('CASE 3');
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: false);
     } else {
       throw FormatException('Unrecognized schedule: $rules');
@@ -407,8 +409,8 @@ class NotamSchedule {
       // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
       // We could try to check if startTimeStr and endTimeStr are numbers
       throw Exception(
-        '''Parser limitation Error: OPADD rules allows ${match.input} which represents an activity that spans over nearly one week.
-        However this parser is only able to parse day range up to 6 days, not 7 days.''',
+        '''\nParser limitation Error: OPADD rules allows ${match.input} which probably represents an activity 
+        that spans over nearly one week. However this parser is only able to parse day range up to 6 days, not 7 days.''',
       );
 
       /* 

@@ -1,4 +1,6 @@
-final dCheckingString = '''D) SR-SS
+final dCheckingString = '''
+D) 13 H24
+D) SR-SS
 D) SS-2359
 D) SS-2259
 D) SAT H24
