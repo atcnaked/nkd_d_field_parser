@@ -10,6 +10,9 @@ void svoop01() {
   final dFields2 = ['JAN 15 1430-FEB 28 SR PLUS30'];
   final dFields3 = ['H24', '0000-2357'];
   final dFields4 = ['SUN H24'];
+  final dFields6 = ['13 H24'];
+
+  final dFields7 = ['10 01 H24', 'FEB 07 JAN 02 H24'];
   final dFieldsError = ['0830-1600 EXC SAT'];
 
   final dCheckingListWOD = dCheckingString
@@ -17,24 +20,21 @@ void svoop01() {
       .map((e) => e.trim())
       .toList();
 
-
   final dCheckingList = [];
   for (var lineWithComma in dCheckingListWOD) {
-    final commaParts = lineWithComma.split(',').map((e)=>e.trim()).toList();
-      dCheckingList.addAll(commaParts);
-   
+    final commaParts = lineWithComma.split(',').map((e) => e.trim()).toList();
+    dCheckingList.addAll(commaParts);
   }
 
-
-String parsed ='';
-final len = dCheckingList.length;
-int counter = 1;
+  String parsed = '';
+  final len = dCheckingList.length;
+  int counter = 1;
   try {
     for (var element in dCheckingList) {
-       parsed = element;
-       if (element.isEmpty) {
-         continue;
-       }
+      parsed = element;
+      if (element.isEmpty) {
+        continue;
+      }
       final List<NotamSchedule> res = NotamSchedule.parse(
         element,
         baseDate: dtNow,

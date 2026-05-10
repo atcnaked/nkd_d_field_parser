@@ -717,7 +717,7 @@ try {
         // --- THE CHRONOLOGICAL CHECK ---
         if (previousDate != null && startDate.isBefore(previousDate)) {
           print(
-            '\nWARNING: OPADD Violation: Dates are not in chronological order ("$fromDay" appears after a later date) in string: $string.\n',
+            '\nWARNING: OPADD Violation: Dates are not in chronological order ("${startDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}) in string: $string.\n',
           );
         }
         // Update the tracker to the end of the range
@@ -754,9 +754,24 @@ try {
         // --- THE CHRONOLOGICAL CHECK ---
         if (previousDate != null && currentDate.isBefore(previousDate)) {
           print(
-            '\nWARNING: OPADD Violation: Dates are not in chronological order ("$currentDay" appears after a later date) in string: $string.\n',
+            '\nWARNING: OPADD Violation: Dates are not in chronological order ("${currentDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}") in string: $string.\n',
           );
         }
+         if (previousDate != null &&  currentDate.isAtSameMomentAs(previousDate)) {
+          print(
+            '\nWARNING: OPADD Violation: Date "$currentDate" appeared twice in string: $string.\n',
+          );
+        }
+                final currDate = DateTime(
+              baseDate.year,
+              baseDate.month,
+              int.parse(dateMatch.namedGroup('day')!),
+            );
+
+        array.add(
+          AixmDate(
+           currDate
+          ));
         // Update the tracker
         previousDate = currentDate;
 
