@@ -354,7 +354,7 @@ class NotamSchedule {
     final endTimeStr = match.namedGroup('endTime')!;
 
     // 1. Convert strings to integers (1=MON, 7=SUN)
-    final startWeekday = _dayStringToWeekday(startDayStr);
+    final startWeekday = _dayStringToWeekday(startDayStr); 
     final endWeekday = _dayStringToWeekday(endDayStr);
 
     final startTime = _timeFrom(startTimeStr);
