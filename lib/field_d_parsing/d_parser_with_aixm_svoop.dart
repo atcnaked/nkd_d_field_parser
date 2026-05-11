@@ -13,6 +13,9 @@ void svoop01() {
   final dFields6 = ['13 H24'];
 
   final dFields7 = ['10 01 H24', 'FEB 07 JAN 02 H24'];
+  final dFields8 = ['2000-0157'];
+  final dFields9a = ['14 2301-17 2359  EXC 16','14 2301-17 2359  EXC FRI','13 2301-16 2359 ','14 2301-17 2359  EXC MAR'];
+  final dFields9 = ['14 2301-17 2359 ','14 2301-17 2359  EXC MAR'];
   final dFieldsError = ['0830-1600 EXC SAT'];
 
   final dCheckingListWOD = dCheckingString

@@ -173,6 +173,12 @@ class NotamSchedule {
     final cleaned = _cleanup(string);
     final parts = cleaned.split(RegExp(r' EXC '));
     final rules = parts[0].trim();
+    if (cleaned.contains('EVERY')) {
+      // TODO
+      // DAILY is implemented, DLY does not exist anymore, maybe it is replaced by EVERY?
+      // simply removing EVERY from seems enough actually
+      throw UnimplementedError('cleaned.contains_EVERY Unimplemented');
+    }
     final exceptions = parts.length > 1 ? parts[1].trim() : '';
 
     // Force day to 1 as per Ruby logic `base_date.at(day: 1)`
@@ -185,28 +191,27 @@ class NotamSchedule {
       r'^(?:(?:MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|DLY)|(?:(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)-(?:(?:[01]\d|2[0-4])[0-5]\d|(?:SR|SS)(?:\s(?:PLUS|MINUS)\d+)?)|(?:H24|HJ|HN)))',
     ); */
 
-     print('CASE START');
+    print('CASE START');
     // AI fix: Handle OPADD Example 8 (Continuous multi-day block using Days)
     // matches TimeRange with weekdays: MON 1100-FRI 1100
     final dayTimeMatch = RegExp('^$dayTimeRangeRe\$').firstMatch(rules);
     if (dayTimeMatch != null) {
-     print('CASE 0');
+      print('CASE 0');
       return _parseDaytimeRange(dayTimeMatch, exceptions, normalizedBaseDate);
     }
     // matches TimeRange with dates (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
-       print('CASE 1');
+      print('CASE 1');
       return _parseDatetimes(rules, exceptions, normalizedBaseDate);
     } else
-    
     // matches weekdays or simple TimeRange : SUN or 1430-SR PLUS30
     if (RegExp('^($dayRe|$timeRangeReNoCG)').hasMatch(rules)) {
-        print('CASE 2');
+      print('CASE 2');
 
       // matchesremaing dates (with or without month): Mar 4 13-15 APR 6
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: true);
     } else if (RegExp('^($dateRe|$monthRe)').hasMatch(rules)) {
-       print('CASE 3');
+      print('CASE 3');
       return _parseUnit(rules, exceptions, normalizedBaseDate, isDays: false);
     } else {
       throw FormatException('Unrecognized schedule: $rules');
@@ -263,26 +268,29 @@ class NotamSchedule {
       final rawTimes = rules.substring(timeMatch.start).trim();
       times = _timesFrom(rawTimes);
     }
-
-    // Continue with standard parsing...
-    // final actives = isDays ? _daysFrom(rawActiveUnit) : _datesFrom(rawActiveUnit, baseDate);
-    /////////////
+    print(
+      'TODO check MISTAKE OPADD 2.3.18.17: If all periods of activity start in the same month See Code',
+    );
+    // TODO check MISTAKE OPADD 2.3.18.17
     /* 
-    final rawActiveUnit = rules.substring(0, timeMatch.start).trim();
-    final rawTimes = rules.substring(timeMatch.start).trim();
-    final times = _timesFrom(rawTimes);
- */
+OPADD 2.3.18.17: If all periods of activity start in the same month, 
+  it is not necessary to include the name of the month in Item D) 
+  */
+    /// we could have rules 29 02 H24 for a Notam running from the JAN 28 to FEB 03
+    /// Obviously it is not legit but 29 => JAN 29 and 02 => FEB 02
+    /// We must check that the result is in the range or decide to let it crash but it is not sure as
+    /// there is a pruning/ clamping of impossible dates at the end (it is the case for days like MON SAT)
+    /// but we could force an error for dates
+    /// Actually OPADD 2020 clearly states that month should appear in this case and that dates must be in order
+    // Continue with standard parsing...
     final actives = isDays
         ? _daysFrom(rawActiveUnit)
         : _datesFrom(rawActiveUnit, baseDate);
-    /* 
-// original
-    final inactives = isDays
-        ? _datesFrom(exceptions, baseDate)
-        : _daysFrom(exceptions);
- */
+/* 
     // AI fix:
     List<dynamic> inactives = [];
+    print('TODO THE CODE BELOW may needs patch and refactorization ');
+
     if (exceptions.isNotEmpty) {
       // If the exception contains a 3-letter day (MON, TUE, etc.), parse it as Days.
       // Otherwise, parse it as Dates.
@@ -292,7 +300,12 @@ class NotamSchedule {
         inactives = _datesFrom(exceptions, baseDate);
       }
     }
-
+ */
+ final List<dynamic> inactives = getInactive(
+      exceptions,
+      baseDate,
+      rules,
+    );
     List<NotamSchedule> results = [];
 
     bool hasMidnightCross = times.any(
@@ -356,19 +369,26 @@ class NotamSchedule {
     final endTimeStr = match.namedGroup('endTime')!;
 
     // 1. Convert strings to integers (1=MON, 7=SUN)
-    final startWeekday = _dayStringToWeekday(startDayStr); 
+    final startWeekday = _dayStringToWeekday(startDayStr);
     final endWeekday = _dayStringToWeekday(endDayStr);
 
     final startTime = _timeFrom(startTimeStr);
     final endTime = _timeFrom(endTimeStr);
-
+/* 
     // Parse the exceptions cleanly using our smart logic
     List<dynamic> inactives = [];
+    print('TODO THE CODE BELOW may needs patch and refactorization ');
     if (exceptions.isNotEmpty) {
       inactives = RegExp(dayRe).hasMatch(exceptions)
           ? _daysFrom(exceptions)
           : _datesFrom(exceptions, baseDate);
     }
+ */
+     final List<dynamic> inactives = getInactive(
+      exceptions,
+      baseDate,
+      match.group(0)!,
+    );
 
     final List<NotamSchedule> results = [];
 
@@ -388,10 +408,10 @@ class NotamSchedule {
         final myStartTime = startHourInt * 60 + startMinuteInt;
         final myEndTime = endHourInt * 60 + endMinuteInt;
         if (myStartTime < myEndTime) {
-            // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
-        print(
-          'WARNING: ${match.input} violates OPADD rules but was accepted as "$startDayStr $startTimeStr-$endTimeStr"',
-        );
+          // for instance MON 1000 - MON 1800 is not OPADD compliant, anyway it is considered that MON 1000-1800 was the intent
+          print(
+            'WARNING: ${match.input} violates OPADD rules but was accepted as "$startDayStr $startTimeStr-$endTimeStr"',
+          );
           results.add(
             NotamSchedule._(
               actives: [AixmDay(startDayStr)],
@@ -402,31 +422,24 @@ class NotamSchedule {
           );
           return results;
         }
-      } catch (e) {
-      log('_parseDaytimeRange time parsing error: $e');
-      }
 
-      // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
-      // We could try to check if startTimeStr and endTimeStr are numbers
+        if (myStartTime >= myEndTime) {
+          // for instance MON 1700 - MON 0900 is OPADD compliant
+          // the case could be handle but see below.
+          log('do nothing in spite myStartTime >= myEndTime');
+        }
+      } catch (e) {
+        log('_parseDaytimeRange time parsing error: $e');
+      }
+      //from here we consider that myStartTime or myEndTime can not be created due
+      //to parsing error above so we are unable to check whether myStartTime > myEndTime.
+      // It could be accepted that hours are correct and the intent was to create a one week long period but
+      // it is chosen to consider that the originator made a mistake. It is believed that one week long period
+      // won't happened often so the work for it is not worth it yet.
       throw Exception(
         '''\nParser limitation Error: OPADD rules allows ${match.input} which probably represents an activity 
         that spans over nearly one week. However this parser is only able to parse day range up to 6 days, not 7 days.''',
       );
-
-      /* 
-      this parser is unable to check whether startTimeStr: $startTimeStr is 
-    before endTimeStr: $endTimeStr in ${match.input} \nso it can not tell if 
-    the activity spans over one day or over nealy one week
-       */
-      results.add(
-        NotamSchedule._(
-          actives: [AixmDay(startDayStr)],
-          times: [AixmRange(startTime, endTime)],
-          inactives: inactives,
-          baseDate: baseDate,
-        ),
-      );
-      return results;
     }
 
     /* 
@@ -612,9 +625,24 @@ try {
         'Invalid datetime range: delta is less than 1 day ($rules)',
       );
     }
-
+    print(
+      'A OPADD dictates exceptions must be DaysZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
+    );
     // 3. Parse exceptions. Since active units are Dates, OPADD dictates exceptions must be Days.
-    final inactives = _daysFrom(exceptions);
+
+    // TODO check OPADD 2.3.18.16
+    /* 
+check 2.3.18.16: Item D) shall contain either days of the week (MON, TUE,...) or dates (01 02 03...).
+When days are used, dates may follow the expression ‘EXC’.
+Example: D) MON-FRI 0600-1700 EXC DEC 05
+ */
+    //TODO
+    print('TODO THE CODE BELOW may appear 3 times => refactorization ');
+    final List<dynamic> inactives = getInactive(
+      exceptions,
+      baseDate,
+      rules,
+    );
 
     final List<NotamSchedule> results = [];
 
@@ -654,6 +682,26 @@ try {
     );
 
     return results;
+  }
+
+  static List<dynamic> getInactive(
+    String exceptions,
+    DateTime baseDate,
+    String rules,
+  ) {
+    if (exceptions.isEmpty) {
+      return [];
+    }
+    if (RegExp(dayRe).hasMatch(exceptions)) {
+      final List<dynamic> inactives = _daysFrom(exceptions);
+      return inactives;
+    } else if (RegExp(dateRe).hasMatch(exceptions)) {
+      final List<dynamic> inactives = _datesFrom(exceptions, baseDate);
+      return inactives;
+    }
+    throw Exception(
+      'could not parse exceptions,date or days not found in exceptions: $exceptions of string :$rules EXC $exceptions ',
+    );
   }
 
   /// Helper to extract both the Date and Time from a string like "JAN 01 0800" or "05 SR"
@@ -757,21 +805,19 @@ try {
             '\nWARNING: OPADD Violation: Dates are not in chronological order ("${currentDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}") in string: $string.\n',
           );
         }
-         if (previousDate != null &&  currentDate.isAtSameMomentAs(previousDate)) {
+        if (previousDate != null &&
+            currentDate.isAtSameMomentAs(previousDate)) {
           print(
             '\nWARNING: OPADD Violation: Date "$currentDate" appeared twice in string: $string.\n',
           );
         }
-                final currDate = DateTime(
-              baseDate.year,
-              baseDate.month,
-              int.parse(dateMatch.namedGroup('day')!),
-            );
+        final currDate = DateTime(
+          baseDate.year,
+          baseDate.month,
+          int.parse(dateMatch.namedGroup('day')!),
+        );
 
-        array.add(
-          AixmDate(
-           currDate
-          ));
+        array.add(AixmDate(currDate));
         // Update the tracker
         previousDate = currentDate;
 
