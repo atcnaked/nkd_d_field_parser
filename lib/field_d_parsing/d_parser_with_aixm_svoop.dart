@@ -25,7 +25,7 @@ void svoop01() {
       .toList();
 
   final dCheckingList = [];
-  for (var lineWithComma in dFields10) {
+  for (var lineWithComma in dFields7) {
     final commaParts = lineWithComma.split(',').map((e) => e.trim()).toList();
     dCheckingList.addAll(commaParts);
   }

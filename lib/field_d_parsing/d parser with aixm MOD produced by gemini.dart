@@ -268,9 +268,7 @@ class NotamSchedule {
       final rawTimes = rules.substring(timeMatch.start).trim();
       times = _timesFrom(rawTimes);
     }
-    print(
-      'TODO check MISTAKE OPADD 2.3.18.17: If all periods of activity start in the same month See Code',
-    );
+   // print(      'TODO check MISTAKE OPADD 2.3.18.17: If all periods of activity start in the same month See Code',    );
     // TODO check MISTAKE OPADD 2.3.18.17
     /* 
 OPADD 2.3.18.17: If all periods of activity start in the same month, 
@@ -473,15 +471,18 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
 
     // Block 3: The End Day (From 00:00 until end time)
     if (startWeekday == endWeekday) {
-    // adding the Schedule inside the same day to avoid for it to appear 2 times
-    
+      // adding the Schedule inside the same day to avoid for it to appear 2 times
+      // this try block can be removed: same day will appear 2 times in the list
+
       try {
-      final firstNotamSchedule = results.first;
-      final firstTime = firstNotamSchedule.times.first;
-      firstNotamSchedule.times.clear();
-      final newTimes = [AixmRange(AixmTime.beginningOfDay, endTime), firstTime];
-      firstNotamSchedule.times.addAll(newTimes);
-        
+        final firstNotamSchedule = results.first;
+        final firstTime = firstNotamSchedule.times.first;
+        firstNotamSchedule.times.clear();
+        final newTimes = [
+          AixmRange(AixmTime.beginningOfDay, endTime),
+          firstTime,
+        ];
+        firstNotamSchedule.times.addAll(newTimes);
       } catch (e) {
         print('$e when adding schedule inside the same day');
       }
@@ -758,8 +759,8 @@ Example: D) MON-FRI 0600-1700 EXC DEC 05
         final endDate = DateTime(baseDate.year, endMonth, toDay);
         // --- THE CHRONOLOGICAL CHECK ---
         if (previousDate != null && startDate.isBefore(previousDate)) {
-          print(
-            '\nWARNING: OPADD Violation: Dates are not in chronological order ("${startDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}) in string: $string.\n',
+          throw Exception(
+            'OPADD Violation: Dates are not in chronological order ("${startDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}) in string: $string.\n',
           );
         }
         // Update the tracker to the end of the range
@@ -795,8 +796,8 @@ Example: D) MON-FRI 0600-1700 EXC DEC 05
 
         // --- THE CHRONOLOGICAL CHECK ---
         if (previousDate != null && currentDate.isBefore(previousDate)) {
-          print(
-            '\nWARNING: OPADD Violation: Dates are not in chronological order ("${currentDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}") in string: $string.\n',
+          throw Exception(
+            'OPADD Violation: Dates are not in chronological order ("${currentDate.toString().substring(0, 10)}" appears after "${previousDate.toString().substring(0, 10)}") in string: $string.\n',
           );
         }
         if (previousDate != null &&
