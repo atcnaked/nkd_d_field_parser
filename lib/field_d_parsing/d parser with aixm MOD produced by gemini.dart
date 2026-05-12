@@ -286,7 +286,7 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     final actives = isDays
         ? _daysFrom(rawActiveUnit)
         : _datesFrom(rawActiveUnit, baseDate);
-/* 
+    /* 
     // AI fix:
     List<dynamic> inactives = [];
     print('TODO THE CODE BELOW may needs patch and refactorization ');
@@ -301,11 +301,7 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
       }
     }
  */
- final List<dynamic> inactives = getInactive(
-      exceptions,
-      baseDate,
-      rules,
-    );
+    final List<dynamic> inactives = getInactive(exceptions, baseDate, rules);
     List<NotamSchedule> results = [];
 
     bool hasMidnightCross = times.any(
@@ -374,7 +370,7 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
 
     final startTime = _timeFrom(startTimeStr);
     final endTime = _timeFrom(endTimeStr);
-/* 
+    /* 
     // Parse the exceptions cleanly using our smart logic
     List<dynamic> inactives = [];
     print('TODO THE CODE BELOW may needs patch and refactorization ');
@@ -384,7 +380,7 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
           : _datesFrom(exceptions, baseDate);
     }
  */
-     final List<dynamic> inactives = getInactive(
+    final List<dynamic> inactives = getInactive(
       exceptions,
       baseDate,
       match.group(0)!,
@@ -395,10 +391,24 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     // --- EDGE CASE: Same Day (e.g., MON 1000 - MON 1800) ---
     // (If they wrote it this way instead of the standard MON 1000-1800)
     if (startWeekday == endWeekday) {
+      if (startTimeStr == endTimeStr) {
+        if (exceptions.isEmpty) {
+          print(
+            'error in decoding ${match.input}, startTimeStr == endTimeStr (=$startTimeStr)',
+          );
+          return results;
+        } else {
+          throw Exception(
+            '''\nerror in decoding ${match.input}, startTimeStr == endTimeStr (=$startTimeStr); exceptions is not empty: $exceptions.''',
+          );
+        }
+      }
+
       final int startHourInt;
       final int startMinuteInt;
       final int endHourInt;
       final int endMinuteInt;
+
       try {
         startHourInt = int.parse(startTimeStr.substring(0, 2));
         startMinuteInt = int.parse(startTimeStr.substring(2, 4));
@@ -410,7 +420,8 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
         if (myStartTime < myEndTime) {
           // for instance MON 1000 - MON 1800 is not OPADD compliant, anyway it is considered that MON 1000-1800 was the intent
           print(
-            'WARNING: ${match.input} violates OPADD rules but was accepted as "$startDayStr $startTimeStr-$endTimeStr"',
+            '''WARNING: ${match.input} violates OPADD rules but was accepted as "$startDayStr $startTimeStr-$endTimeStr".
+            Beware that this parser can not correct if an hour had been like SS or SR.''',
           );
           results.add(
             NotamSchedule._(
@@ -424,44 +435,16 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
         }
 
         if (myStartTime >= myEndTime) {
-          // for instance MON 1700 - MON 0900 is OPADD compliant
-          // the case could be handle but see below.
-          log('do nothing in spite myStartTime >= myEndTime');
+          /// exit the try block
         }
       } catch (e) {
         log('_parseDaytimeRange time parsing error: $e');
       }
-      //from here we consider that myStartTime or myEndTime can not be created due
-      //to parsing error above so we are unable to check whether myStartTime > myEndTime.
-      // It could be accepted that hours are correct and the intent was to create a one week long period but
-      // it is chosen to consider that the originator made a mistake. It is believed that one week long period
-      // won't happened often so the work for it is not worth it yet.
-      throw Exception(
-        '''\nParser limitation Error: OPADD rules allows ${match.input} which probably represents an activity 
-        that spans over nearly one week. However this parser is only able to parse day range up to 6 days, not 7 days.''',
-      );
+      // from here we consider that myStartTime > myEndTime even thow we could not fully check it
     }
 
-    /* 
-    
-         final int startHourInt;
-      final int  startMinuteInt;
-      final int  endHourInt;
-      final int  endMinuteInt ;
-try {
-       startHourInt = int.parse(startTimeStr.substring(0, 2));
-       startMinuteInt = int.parse(startTimeStr.substring(2, 4)); 
-       endHourInt = int.parse(endTimeStr.substring(0, 2));
-       endMinuteInt = int.parse(endTimeStr.substring(2, 4)); 
-  
-} catch (e) {
-   // we assume that startTime.compareTo(endTime) < 0 (else it has no meaning)
-    throw Exception('Parse limitation error: Parser is unable to check whether startTimeStr is before endTimeStr ${match.input}');
-     
-}
-     */
-
     // --- STANDARD MULTI-DAY BLOCK (e.g., MON 1000 - FRI 1200) ---
+    // works also for the same day (e.g., MON 1900 - MON 0400)
 
     // Block 1: The Start Day (From start time until 23:59)
     results.add(
@@ -489,14 +472,29 @@ try {
     }
 
     // Block 3: The End Day (From 00:00 until end time)
-    results.add(
-      NotamSchedule._(
-        actives: [AixmDay(endTimeStr)],
-        times: [AixmRange(AixmTime.beginningOfDay, endTime)], // 00:00
-        inactives: inactives,
-        baseDate: baseDate,
-      ),
-    );
+    if (startWeekday == endWeekday) {
+    // adding the Schedule inside the same day to avoid for it to appear 2 times
+    
+      try {
+      final firstNotamSchedule = results.first;
+      final firstTime = firstNotamSchedule.times.first;
+      firstNotamSchedule.times.clear();
+      final newTimes = [AixmRange(AixmTime.beginningOfDay, endTime), firstTime];
+      firstNotamSchedule.times.addAll(newTimes);
+        
+      } catch (e) {
+        print('$e when adding schedule inside the same day');
+      }
+    } else {
+      results.add(
+        NotamSchedule._(
+          actives: [AixmDay(endDayStr)],
+          times: [AixmRange(AixmTime.beginningOfDay, endTime)], // 00:00
+          inactives: inactives,
+          baseDate: baseDate,
+        ),
+      );
+    }
 
     return results;
   }
@@ -626,7 +624,7 @@ try {
       );
     }
     print(
-      'A OPADD dictates exceptions must be DaysZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
+      'TODO OPADD 2.3.18.16:  dictates Item D)  shall contain either days of the week (MON, TUE,...) or dates (01 02 03...)',
     );
     // 3. Parse exceptions. Since active units are Dates, OPADD dictates exceptions must be Days.
 
@@ -638,11 +636,7 @@ Example: D) MON-FRI 0600-1700 EXC DEC 05
  */
     //TODO
     print('TODO THE CODE BELOW may appear 3 times => refactorization ');
-    final List<dynamic> inactives = getInactive(
-      exceptions,
-      baseDate,
-      rules,
-    );
+    final List<dynamic> inactives = getInactive(exceptions, baseDate, rules);
 
     final List<NotamSchedule> results = [];
 
