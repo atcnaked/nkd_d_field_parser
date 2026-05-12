@@ -1,145 +1,19 @@
 import 'dart:developer';
 
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart'; // Used for sliceWhen equivalent
+import 'package:flutter/material.dart';
+
+import '../d_field_lists/src/aixm_models.dart';
+import '../d_field_lists/src/regex_constants.dart'; // Used for sliceWhen equivalent
 
 /// --- MOCK AIXM CLASSES ---
 /// These classes mimic the behavior of the Ruby AIXM gem used in the original script
 /// so that the parsing logic remains structurally identical.
 
-class AixmTime {
-  final String? time;
-  final String? event; // 'sunrise' or 'sunset'
-  final int delta; // PLUS/MINUS minutes
-
-  const AixmTime.literal(this.time) : event = null, delta = 0;
-  const AixmTime.event(this.event, {this.delta = 0}) : time = null;
-
-  static const beginningOfDay = AixmTime.literal('00:00');
-  static const endOfDay = AixmTime.literal(
-    '23:59',
-  ); // AIXM uses 24:00 internally, but 23:59 is standard for Dart
-
-  @override
-  String toString() =>
-      time ?? '$event${delta != 0 ? ' ${delta > 0 ? '+' : ''}$delta' : ''}';
-}
-
-class AixmDate {
-  final DateTime date;
-  AixmDate(this.date);
-
-  AixmDate get next => AixmDate(date.add(const Duration(days: 1)));
-  AixmDate get prev => AixmDate(date.subtract(const Duration(days: 1)));
-
-  @override
-  String toString() =>
-      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) || other is AixmDate && date == other.date;
-  @override
-  int get hashCode => date.hashCode;
-}
-
-class AixmDay {
-  final String dayName;
-  const AixmDay(this.dayName);
-
-  static const any = AixmDay('any');
-  @override
-  String toString() => dayName;
-}
-
-class AixmRange<T> {
-  final T start;
-  final T end;
-  const AixmRange(this.start, this.end);
-  @override
-  String toString() => '$start..$end';
-}
-
 /// --- MAIN NOTAM SCHEDULE CLASS ---
 /// Translated from NOTAM::Schedule
 
 class NotamSchedule {
-  // 1. Constants
-  static const Map<String, String> events = {'SR': 'sunrise', 'SS': 'sunset'};
-  static const Map<String, AixmTime> eventHours = {
-    'sunrise': AixmTime.literal('06:00'),
-    'sunset': AixmTime.literal('18:00'),
-  };
-  static const Map<String, int> operations = {'PLUS': 1, 'MINUS': -1};
-  static const Map<String, int> months = {
-    'JAN': 1,
-    'FEB': 2,
-    'MAR': 3,
-    'APR': 4,
-    'MAY': 5,
-    'JUN': 6,
-    'JUL': 7,
-    'AUG': 8,
-    'SEP': 9,
-    'OCT': 10,
-    'NOV': 11,
-    'DEC': 12,
-  };
-  static const Map<String, String> days = {
-    'MON': 'monday',
-    'TUE': 'tuesday',
-    'WED': 'wednesday',
-    'THU': 'thursday',
-    'FRI': 'friday',
-    'SAT': 'saturday',
-    'SUN': 'sunday',
-    'DAILY': 'any',
-    'DLY': 'any',
-  };
-
-  // 2. Regex Patterns with capture groups
-  static const String dateRe = r'(?:[0-2]\d|3[01])';
-  static final String dayRe = '(?:${days.keys.join('|')})';
-  static final String monthRe = '(?:${months.keys.join('|')})';
-  static const String hcodeRe = r'(?<hcode>H24|HJ|HN)';
-  static const String hourRe = r'(?<hour>[01]\d|2[0-4])(?<minute>[0-5]\d)';
-  static final String operationsRe = '(?:${operations.keys.join('|')})';
-  static final String eventRe =
-      '(?<event>SR|SS)(?:\\s(?<operation>$operationsRe)(?<delta>\\d+))?';
-  static final String timeRe = '(?:$hourRe|$eventRe)';
-  static final String timeRangeRe = '(?:$timeRe-$timeRe|$hcodeRe)';
-  static final String datetimeRe =
-      '(?:(?<month>$monthRe) )?(?<date>$dateRe) (?<time>$timeRe)';
-  static final String datetimeRangeRe = '$datetimeRe-$datetimeRe';
-
-  // 2. Regex Patterns no named capture groups
-  static const String hcodeReNoCG = r'(H24|HJ|HN)';
-  static const String hourReNoCG = r'([01]\d|2[0-4])([0-5]\d)';
-  static final String eventReNoCG = '(SR|SS)(?:\\s($operationsRe)(\\d+))?';
-  static final String timeReNoCG = '(?:$hourReNoCG|$eventReNoCG)';
-  static final String timeRangeReNoCG =
-      '(?:$timeReNoCG-$timeReNoCG|$hcodeReNoCG)';
-
-  static final String datetimeReNoCG =
-      '(?:($monthRe) )?($dateRe) ($timeReNoCG)';
-  static final String datetimeRangeReNoCG = '$datetimeReNoCG-$datetimeReNoCG';
-
-  // AI fix: to Match "MON 1000-FRI 1200"
-  static final String dayTimeRangeRe =
-      '(?<startDay>$dayRe) (?<startTime>$timeReNoCG)-(?<endDay>$dayRe) (?<endTime>$timeReNoCG)';
-  //
-  static const AixmRange<AixmTime> h24 = AixmRange(
-    AixmTime.beginningOfDay,
-    AixmTime.endOfDay,
-  );
-  static final AixmRange<AixmTime> hj = AixmRange(
-    AixmTime.event('sunrise'),
-    AixmTime.event('sunset'),
-  );
-  static final AixmRange<AixmTime> hn = AixmRange(
-    AixmTime.event('sunset'),
-    AixmTime.event('sunrise'),
-  );
 
   // 3. Properties
   final List<dynamic> actives; // Array of AixmDate, AixmDay, or AixmRange
@@ -159,6 +33,8 @@ class NotamSchedule {
     return 'NotamSchedule(actives: $actives, times: $times, inactives: $inactives)';
   }
 
+
+
   // --- PARSING LOGIC ---
 
   /// Parse a schedule elements.
@@ -173,11 +49,12 @@ class NotamSchedule {
     final cleaned = _cleanup(string);
     final parts = cleaned.split(RegExp(r' EXC '));
     final rules = parts[0].trim();
+    print('HJ and HN does not exist in last Opadd');
     if (cleaned.contains('EVERY')) {
       // TODO
       // DAILY is implemented, DLY does not exist anymore, maybe it is replaced by EVERY?
       // simply removing EVERY from seems enough actually
-      throw UnimplementedError('cleaned.contains_EVERY Unimplemented');
+      throw UnimplementedError('TODO cleaned.contains_EVERY Unimplemented');
     }
     final exceptions = parts.length > 1 ? parts[1].trim() : '';
 
@@ -199,7 +76,8 @@ class NotamSchedule {
       print('CASE 0');
       return _parseDaytimeRange(dayTimeMatch, exceptions, normalizedBaseDate);
     }
-    // matches TimeRange with dates (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
+    // matches TimeRange with dates 
+    // (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
       print('CASE 1');
       return _parseDatetimes(rules, exceptions, normalizedBaseDate);

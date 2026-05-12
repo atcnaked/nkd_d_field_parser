@@ -1,7 +1,7 @@
 //static List<NotamSchedule> parse(String string, {required DateTime baseDate}) {
 
 import 'd parser with aixm mod D field list.dart';
-import 'd parser with aixm MOD produced by gemini.dart';
+import 'd parser with aixm MOD v1.dart';
 
 void svoop01() {
   final dtNow = DateTime.now();
@@ -17,6 +17,7 @@ void svoop01() {
   final dFields10 = ['MON 1700 - MON 0300', 'MON 1000 - MON 1200'];
   final dFields9a = ['14 2301-17 2359  EXC 16','14 2301-17 2359  EXC FRI','13 2301-16 2359 ','14 2301-17 2359  EXC MAR'];
   final dFields9 = ['14 2301-17 2359 ','14 2301-17 2359  EXC MAR'];
+  final dFields11 = ['0830-1100','1300-SS PLUS30'];
   final dFieldsError = ['0830-1600 EXC SAT'];
 
   final dCheckingListWOD = dCheckingString
@@ -25,7 +26,7 @@ void svoop01() {
       .toList();
 
   final dCheckingList = [];
-  for (var lineWithComma in dFields7) {
+  for (var lineWithComma in dFields11) {
     final commaParts = lineWithComma.split(',').map((e) => e.trim()).toList();
     dCheckingList.addAll(commaParts);
   }
@@ -34,7 +35,7 @@ void svoop01() {
   final len = dCheckingList.length;
   int counter = 1;
   try {
-    for (var element in dCheckingList) {
+    for (var element in dFields11) {
       parsed = element;
       if (element.isEmpty) {
         continue;
