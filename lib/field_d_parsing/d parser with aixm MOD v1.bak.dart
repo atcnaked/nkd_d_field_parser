@@ -4,7 +4,6 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 
 import '../d_field_lists/src/aixm_models.dart';
-import '../d_field_lists/src/date_weekday_helpers.dart';
 import '../d_field_lists/src/regex_constants.dart'; // Used for sliceWhen equivalent
 
 /// --- MOCK AIXM CLASSES ---
@@ -81,7 +80,7 @@ class NotamSchedule {
     // (with or without month, always with the day number (1 to 31)): JAN 15 1430-FEB 28 SR PLUS30
     if (RegExp('^$datetimeRangeReNoCG\$').hasMatch(rules)) {
       print('CASE 1');
-      return _parseDatetimesRange(rules, exceptions, normalizedBaseDate);
+      return _parseDatetimes(rules, exceptions, normalizedBaseDate);
     } else
     // matches weekdays or simple TimeRange : SUN or 1430-SR PLUS30
     if (RegExp('^($dayRe|$timeRangeReNoCG)').hasMatch(rules)) {
@@ -172,20 +171,18 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
       // If the exception contains a 3-letter day (MON, TUE, etc.), parse it as Days.
       // Otherwise, parse it as Dates.
       if (RegExp(dayRe).hasMatch(exceptions)) {
-        inactives = _ daysFrom(exceptions);
+        inactives = _daysFrom(exceptions);
       } else {
-        inactives = _ datesFrom(exceptions, baseDate);
+        inactives = _datesFrom(exceptions, baseDate);
       }
     }
  */
-
     final List<dynamic> inactives = getInactive(exceptions, baseDate, rules);
     List<NotamSchedule> results = [];
 
     bool hasMidnightCross = times.any(
       (t) => t is AixmRange<AixmTime> && _acrossMidnight(t),
     );
-
 
     if (hasMidnightCross) {
       for (var time in times) {
@@ -244,8 +241,8 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     final endTimeStr = match.namedGroup('endTime')!;
 
     // 1. Convert strings to integers (1=MON, 7=SUN)
-    final startWeekday = dayStringToWeekday(startDayStr);
-    final endWeekday = dayStringToWeekday(endDayStr);
+    final startWeekday = _dayStringToWeekday(startDayStr);
+    final endWeekday = _dayStringToWeekday(endDayStr);
 
     final startTime = _timeFrom(startTimeStr);
     final endTime = _timeFrom(endTimeStr);
@@ -256,7 +253,7 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     if (exceptions.isNotEmpty) {
       inactives = RegExp(dayRe).hasMatch(exceptions)
           ? _daysFrom(exceptions)
-          : _ datesFrom(exceptions, baseDate);
+          : _datesFrom(exceptions, baseDate);
     }
  */
     final List<dynamic> inactives = getInactive(
@@ -336,12 +333,12 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     );
 
     // Block 2: The Middle Days (H24)
-    final middleDays = getIntermediateWeekdays(startWeekday, endWeekday);
+    final middleDays = _getIntermediateWeekdays(startWeekday, endWeekday);
     if (middleDays.isNotEmpty) {
       results.add(
         NotamSchedule._(
           actives: middleDays
-              .map((dayInt) => AixmDay(dayIntToWeekday(dayInt)))
+              .map((dayInt) => AixmDay(_dayIntToStringWeekday(dayInt)))
               .toList(),
           times: [h24], // 00:00 - 23:59
           inactives: inactives,
@@ -381,10 +378,102 @@ OPADD 2.3.18.17: If all periods of activity start in the same month,
     return results;
   }
 
+  // Helper to find all days strictly between a start and end day
+  // e.g., MON (1) to FRI (5) returns [2, 3, 4] (TUE, WED, THU)
+  // e.g., FRI (5) to TUE (2) returns [6, 7, 1] (SAT, SUN, MON)
+  static List<int> _getIntermediateWeekdays(int start, int end) {
+    final List<int> days = [];
+    int current =
+        (start % 7) + 1; // Step forward 1 day (wrapping Sunday(7) to Monday(1))
+
+    while (current != end) {
+      days.add(current);
+      current = (current % 7) + 1;
+    }
+
+    return days;
+  }
+
+  /// AI fix:
+  static List<NotamSchedule> _parseDaytimeRangeOld(
+    RegExpMatch match,
+    String exceptions,
+    DateTime baseDate,
+  ) {
+    throw Exception('TODO generates only one date range !');
+    final startDayStr = match.namedGroup('startDay')!;
+    final startTimeStr = match.namedGroup('startTime')!;
+    final endDayStr = match.namedGroup('endDay')!;
+    final endTimeStr = match.namedGroup('endTime')!;
+
+    // 1. Convert day strings (MON, TUE) to Dart weekday integers (1=Mon, 7=Sun)
+    final startWeekday = _dayStringToWeekday(startDayStr);
+    final endWeekday = _dayStringToWeekday(endDayStr);
+
+    // 2. Map the weekdays to actual DateTimes relative to the baseDate
+    DateTime startDate = _nextWeekday(baseDate, startWeekday);
+    DateTime endDate = _nextWeekday(startDate, endWeekday);
+
+    // If they are the same day (e.g. MON 1000 - MON 1800), push the end date forward a week
+    // assuming it's a multi-day block. (Though normally this is just written MON 1000-1800)
+    if (startDate.isAtSameMomentAs(endDate)) {
+      endDate = endDate.add(const Duration(days: 7));
+    }
+
+    // 3. Package them into the format _parseDatetimes expects and reuse that logic!
+    // We format them back into pseudo-strings like "01 1000-05 1200" so we don't have to duplicate code.
+    final pseudoRules =
+        "${startDate.day.toString().padLeft(2, '0')} $startTimeStr-${endDate.day.toString().padLeft(2, '0')} $endTimeStr";
+
+    return _parseDatetimes(pseudoRules, exceptions, startDate);
+  }
+
+  // Helper to map "MON" to 1, "TUE" to 2, etc.
+  static int _dayStringToWeekday(String day) {
+    const map = {
+      'MON': 1,
+      'TUE': 2,
+      'WED': 3,
+      'THU': 4,
+      'FRI': 5,
+      'SAT': 6,
+      'SUN': 7,
+    };
+    return map[day] ?? 1;
+  }
+
+  // Helper to map 1 to "MON", 2 to "TUE", etc.
+  static String _dayIntToStringWeekday(int intDay) {
+    const map = {
+      1: 'MON',
+      2: 'TUE',
+      3: 'WED',
+      4: 'THU',
+      5: 'FRI',
+      6: 'SAT',
+      7: 'SUN',
+    };
+    final res = map[intDay];
+    if (res == null) {
+      throw Exception(
+        'could not get corresponding day from intDay: $intDay in _dayStringToWeekday',
+      );
+    }
+    return res;
+  }
+
+  // Helper to find the exact DateTime of the next occurring specific weekday
+  static DateTime _nextWeekday(DateTime from, int targetWeekday) {
+    int distance = targetWeekday - from.weekday;
+    if (distance < 0) {
+      distance += 7; // It's next week
+    }
+    return from.add(Duration(days: distance));
+  }
 
   ///
 
-  static List<NotamSchedule> _parseDatetimesRange(
+  static List<NotamSchedule> _parseDatetimes(
     String rules,
     String exceptions,
     DateTime baseDate,
@@ -642,6 +731,41 @@ Example: D) MON-FRI 0600-1700 EXC DEC 05
       );
     }
 
+    return array;
+  }
+
+  /// v1, deos not handle month shifts
+  static List<dynamic> _datesFrom_v1(String string, DateTime baseDate) {
+    if (string.isEmpty) return [];
+    List<dynamic> array = [];
+
+    // Simplistic tokenizing for dates: 01-05 or 04
+    final tokens = string.split(' ');
+    for (var token in tokens) {
+      if (token.contains('-')) {
+        final parts = token.split('-');
+        if (parts.length == 2 &&
+            RegExp(dateRe).hasMatch(parts[0]) &&
+            RegExp(dateRe).hasMatch(parts[1])) {
+          array.add(
+            AixmRange(
+              AixmDate(
+                DateTime(baseDate.year, baseDate.month, int.parse(parts[0])),
+              ),
+              AixmDate(
+                DateTime(baseDate.year, baseDate.month, int.parse(parts[1])),
+              ),
+            ),
+          );
+        }
+      } else if (RegExp('^$dateRe\$').hasMatch(token)) {
+        array.add(
+          AixmDate(DateTime(baseDate.year, baseDate.month, int.parse(token))),
+        );
+      } else if (months.containsKey(token)) {
+        baseDate = DateTime(baseDate.year, months[token]!, 1);
+      }
+    }
     return array;
   }
 

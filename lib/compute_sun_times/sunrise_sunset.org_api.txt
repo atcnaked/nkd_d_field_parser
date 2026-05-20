@@ -1,0 +1,133 @@
+Sunset and sunrise times API
+
+on: 
+https://sunrise-sunset.org/api
+
+We offer a free API that provides sunset and sunrise times for a given latitude and longitude.
+
+Please note that attribution is required if you use our API. Check "Usage limits and attribution" section below for more information.
+API documentation
+
+Ours is a very simple REST api, you only have to do a GET request to https://api.sunrise-sunset.org/json. No need to sign up or get an API Key.
+Request parameters
+
+    lat (float): Latitude in decimal degrees. Required.
+    lng (float): Longitude in decimal degrees. Required.
+    date (string): Date in YYYY-MM-DD format. Also accepts other date formats and even relative date formats. If not present, date defaults to current date. Optional.
+    callback (string): Callback function name for JSONP response. Optional.
+    formatted (integer): 0 or 1 (1 is default). Time values in response will be expressed following ISO 8601 and day_length will be expressed in seconds. Optional.
+    tzid (string): A timezone identifier, like for example: UTC, Africa/Lagos, Asia/Hong_Kong, or Europe/Lisbon. The list of valid identifiers is available in this List of Supported Timezones. If provided, the times in the response will be referenced to the given Time Zone. Optional.
+
+Sample requests
+
+These are three sample requests for getting sunset and sunrise information from our API for a given location:
+
+
+https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400
+
+https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&date=today
+
+https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&date=2026-05-18
+https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&formatted=0
+
+Response
+
+The API response include the times for the sun events in the given location. Data is formatted using JSON.
+
+Note that unless you provide a tzid, all times are in UTC and summer time adjustments are not included in the returned data.
+
+An example response:
+
+
+    {
+      "results":
+      {
+        "sunrise":"7:27:02 AM",
+        "sunset":"5:05:55 PM",
+        "solar_noon":"12:16:28 PM",
+        "day_length":"9:38:53",
+        "civil_twilight_begin":"6:58:14 AM",
+        "civil_twilight_end":"5:34:43 PM",
+        "nautical_twilight_begin":"6:25:47 AM",
+        "nautical_twilight_end":"6:07:10 PM",
+        "astronomical_twilight_begin":"5:54:14 AM",
+        "astronomical_twilight_end":"6:38:43 PM"
+      },
+       "status":"OK",
+       "tzid": "UTC"
+    }
+  
+
+Response without date formatting:
+
+
+    {
+      "results":
+      {
+        "sunrise":"2015-05-21T05:05:35+00:00",
+        "sunset":"2015-05-21T19:22:59+00:00",
+        "solar_noon":"2015-05-21T12:14:17+00:00",
+        "day_length":51444,
+        "civil_twilight_begin":"2015-05-21T04:36:17+00:00",
+        "civil_twilight_end":"2015-05-21T19:52:17+00:00",
+        "nautical_twilight_begin":"2015-05-21T04:00:13+00:00",
+        "nautical_twilight_end":"2015-05-21T20:28:21+00:00",
+        "astronomical_twilight_begin":"2015-05-21T03:20:49+00:00",
+        "astronomical_twilight_end":"2015-05-21T21:07:45+00:00"
+      },
+       "status":"OK",
+       "tzid": "UTC"
+    }
+  
+
+Consult our glossary of astronical definitions to understand each element of the response object.
+Status codes
+
+The "status" field within the API response object contains the status of the request. The "status" field may contain the following values:
+
+    "OK": indicates that no errors occurred;
+    "INVALID_REQUEST": indicates that either lat or lng parameters are missing or invalid;
+    "INVALID_DATE": indicates that date parameter is missing or invalid;
+    "UNKNOWN_ERROR": indicates that the request could not be processed due to a server error. The request may succeed if you try again.
+    "INVALID_TZID": indicates that tzid parameter value provided is invalid, response is valid but times are in UTC.
+
+How to use the API from an AJAX request?
+
+Use the parameter callback to receive a JSONP response and avoid cross domain boundaries:
+
+https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&callback=mycallback
+
+Usage limits and attribution
+
+The sunrise and sunset API can be used free of charge. You may not use this API in a manner that exceeds reasonable request volume, constitutes excessive or abusive usage. We require that you show attribution to us with a link to our site.
+Announcements
+
+Subscribe to our API newsletter to keep up to date with changes and announcements about the service:
+
+
+💡 Got a cool idea? 🤦 Found any errors?
+
+We're always improving this website!
+
+If you have an idea of some content or information to include in this page or found an error, please let us know!
+Changelog
+
+    December 27, 2023: Several minor bug fixes.
+    December 5, 2023: New tzid parameter allows you to provide a custom timezone for your requests.
+    November 29, 2023: Released API status page. Subscribe to receive alerts if the service goes down.
+    September 21, 2018: New API server! Downtime problems have been fixed.
+    April 5, 2017: HTTPS requests are accepted.
+    Feb 26, 2016: Dates are now checked to be valid Gregorian dates.
+    May 22, 2015: Support for ISO 8601 dates by adding 'formatted' parameter to request.
+    May 16, 2015: Minor bugs fixed.
+    April 22, 2015: CORS has been enabled.
+    March 15, 2015: Response content type changed to "application/json".
+    February 23, 2015: JSONP response available!
+    December 22, 2014: New data added to the response: solar noon, day length and civil, nautical and astronomical twilight (begin and end).
+    December 16, 2014: First version of the API is out!
+
+Contact
+
+Please contact us for all your API questions.
+
+If you enjoy using our API please consider supporting the project by buying us a coffe!
